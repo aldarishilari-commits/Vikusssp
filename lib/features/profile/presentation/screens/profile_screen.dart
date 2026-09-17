@@ -9,6 +9,7 @@ import '../../../business/presentation/screens/business_profile_screen.dart';
 import '../../../business/presentation/screens/registration/business_registration_flow_screen.dart';
 import '../../../home/presentation/widgets/business_card_item.dart';
 import 'edit_profile_screen.dart';
+import 'pro/vikus_pro_subscription_screen.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -156,6 +157,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             });
           },
         ),
+      ),
+    );
+  }
+
+  void _openVikusProScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const VikusProSubscriptionScreen(),
       ),
     );
   }
@@ -1076,82 +1085,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildBoostBusinessBanner() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF271B3B) : const Color(0xFFF5F3FF),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openVikusProScreen,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0xFF3F2B5C) : const Color(0xFFDDD6FE),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Rocket circle
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF271B3B) : const Color(0xFFF5F3FF),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isDark ? const Color(0xFF3F2B5C) : const Color(0xFFDDD6FE),
             ),
-            child: const Center(
-              child: Icon(
-                Icons.rocket_launch_rounded,
-                size: 20,
-                color: Colors.white,
+          ),
+          child: Row(
+            children: [
+              // Rocket circle
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.rocket_launch_rounded,
+                    size: 20,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Impulsar negocio',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : const Color(0xFF1B1C1C),
-                  ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Impulsar negocio',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF1B1C1C),
+                      ),
+                    ),
+                    Text(
+                      'Aparece primero y consigue más clientes',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  'Aparece primero y consigue más clientes',
-                  style: GoogleFonts.inter(
-                    fontSize: 10.5,
-                    color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('🚀 Activando paquete de impulso publicitario'),
+              ),
+              ElevatedButton(
+                onPressed: _openVikusProScreen,
+                style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text(
-              'Activar',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+                child: Text(
+                  'Activar',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

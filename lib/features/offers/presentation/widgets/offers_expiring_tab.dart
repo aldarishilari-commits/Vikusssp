@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/widgets/app_notification.dart';
 import 'offer_detail_bottom_sheet.dart';
 
 class OffersExpiringTab extends StatefulWidget {
