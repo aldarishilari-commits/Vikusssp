@@ -11,10 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa el servicio de preferencias de tema
   await ThemeService.instance.initialize();
 
-  // Inicializa Supabase antes de montar los widgets o acceder a Supabase.instance.client
   try {
     await SupabaseConfig.initialize();
   } catch (e) {
@@ -32,22 +30,51 @@ class MyApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: ThemeService.instance,
       builder: (context, _) {
-        return MaterialApp(
-          title: 'Vikus - Aeronpulse',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeService.instance.themeMode,
-          home: StreamBuilder<AuthState>(
-            stream: AuthService().authStateChanges,
-            builder: (context, snapshot) {
-              final isAuthenticated = snapshot.data?.session != null || AuthService().isAuthenticated;
-              if (isAuthenticated) {
-                return const HomeScreen(title: 'Vikus');
-              }
-              return const OnboardingCarouselScreen();
-            },
-          ),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth > 600;
+
+            // Tu MaterialApp original
+            Widget app = MaterialApp(
+              title: 'Vikus - Aeronpulse',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: ThemeService.instance.themeMode,
+              home: StreamBuilder<AuthState>(
+                stream: AuthService().authStateChanges,
+                builder: (context, snapshot) {
+                  final isAuthenticated =
+                      snapshot.data?.session != null ||
+                      AuthService().isAuthenticated;
+
+                  if (isAuthenticated) {
+                    return const HomeScreen(title: 'Vikus');
+                  }
+
+                  return const OnboardingCarouselScreen();
+                },
+              ),
+            );
+
+            // En celular se muestra normal.
+            if (!isDesktop) {
+              return app;
+            }
+
+            // En escritorio se centra con tamaño de móvil.
+            return Container(
+              color: const Color(0xFFF5F2FF), // Fondo lila muy claro.
+              alignment: Alignment.center,
+              child: SizedBox(
+                width: 428, // Igual al ancho de tu diseño de Figma.
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: app,
+                ),
+              ),
+            );
+          },
         );
       },
     );
