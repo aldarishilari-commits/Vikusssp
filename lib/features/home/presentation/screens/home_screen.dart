@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../core/config/google_maps_config.dart';
+import '../../../../core/services/business_service.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/services/profile_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -41,14 +42,41 @@ class _HomeScreenState extends State<HomeScreen> {
   BusinessFilterCriteria _filterCriteria = BusinessFilterCriteria();
   Position? _userPosition;
 
+  List<BusinessModel> _businesses = [];
+  bool _isLoadingBusinesses = true;
+
   @override
   void initState() {
     super.initState();
     _loadUserCity();
     _initUserLocation();
-    _searchController.addListener(() {
-      setState(() {});
-    });
+    _loadBusinesses();
+    _searchController.addListener(_onSearchChanged);
+    BusinessService.instance.businessUpdatesNotifier.addListener(_loadBusinesses);
+  }
+
+  void _onSearchChanged() {
+    setState(() {});
+  }
+
+  Future<void> _loadBusinesses() async {
+    try {
+      final list = await BusinessService.instance.getBusinesses(
+        city: _selectedCity,
+      );
+      if (mounted) {
+        setState(() {
+          _businesses = list;
+          _isLoadingBusinesses = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingBusinesses = false;
+        });
+      }
+    }
   }
 
   Future<void> _initUserLocation() async {
@@ -72,152 +100,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  final List<BusinessModel> _businesses = [
-    const BusinessModel(
-      id: 'biz_1',
-      name: 'BODY XTREME',
-      category: 'Deporte',
-      description: 'Pesas y máquinas de musculación, entrenadores certificados.',
-      address: 'Av. Pando',
-      distance: '300 m de ti',
-      distanceKm: 0.3,
-      latitude: -16.5020,
-      longitude: -68.1235,
-      rating: 4.0,
-      reviewsCount: 24,
-      isOpen: true,
-      closingTime: '19:00',
-      promoBadge: 'OFERTA',
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuCyINktqnqAPIa5mHhsKj5Vu990wQ9AhWcODtqCxlx3qRIDttuEhzHckRH1saykU-rRE1GJmi7XPktmZ0ZS3PIdyHl9cz43KiupG7lifDx0ZjujYVPP0igyvsk6Fp4_rmqvLWwJho2gsJH-SdFZgh33v-e6aHeOPtpdHi1eXUctYjnto_OIIYSrnvL3AXiLHYkoPQYE2WRvP0HhihrhaEsv4pWBMvv_r848FMvHuD5wcKZyR7Oconnl_Q',
-      categoryIcon: Icons.fitness_center_rounded,
-      priceLevel: PriceLevel.economic,
-      facebook: 'https://facebook.com/bodyxtremelapaz',
-      instagram: 'bodyxtreme.bo',
-      tiktok: 'bodyxtremelapaz',
-      website: 'https://bodyxtreme.com',
-    ),
-    const BusinessModel(
-      id: 'biz_2',
-      name: 'BODY XTREME SAN PEDRO',
-      category: 'Deporte',
-      description: 'Gym con atención cercana, spinning y precios accesibles.',
-      address: 'Av. Pando',
-      distance: '600 m de ti',
-      distanceKm: 0.6,
-      latitude: -16.5045,
-      longitude: -68.1270,
-      rating: 4.0,
-      reviewsCount: 24,
-      isOpen: true,
-      closingTime: '19:00',
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuA7mNzO7orlhCzyqvQfW3humsoIYpy4YsUHdpx61rAqLiTXTrobKq4TA3fq3I6cVei8kAVrGXuHsvR2hykQqT5VXDbjJ1gI3bcnuia3aW7Iug4-q4n8wvEbYFOPxP1BsIObR6iDxv_EXnIIHA1oP3WYdt_VrLngOfBcEsLnYrXHa5TAiAIyAzQs_UHGamp_jzyZYWg_qbYzjyDjfCThK1nk1BuZRT3V3FhyIvJJ2QmOJ9ew9XL7wBpM_g',
-      categoryIcon: Icons.fitness_center_rounded,
-      priceLevel: PriceLevel.medium,
-      facebook: 'https://facebook.com/bodyxtremesanpedro',
-      instagram: 'bodyxtreme.sanpedro',
-      tiktok: 'bodyxtreme_bo',
-      website: 'https://bodyxtreme.com',
-    ),
-    const BusinessModel(
-      id: 'biz_3',
-      name: 'PIZZA CENTER',
-      category: 'Comida',
-      description: 'Pizzas al horno de piedra, pastas y promociones familiares.',
-      address: 'Av. Principal',
-      distance: '1.2 km de ti',
-      distanceKm: 1.2,
-      latitude: -16.5090,
-      longitude: -68.1310,
-      rating: 4.8,
-      reviewsCount: 86,
-      isOpen: true,
-      closingTime: '23:00',
-      promoBadge: '2X1 HOY',
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuDWx20X9KGhQhhzDwvHmMeqyrqxRuDNPNO-3MhtvG8QErbTZJx_FLjulmAiD6orhyw34AfrjRP44VRBjr_Rjw5b4KiW5VklGmYsI7_jQ-YGceqhTdyCxBuT_nXHDale8_oQaNVpkPa7DslIo_rnrDDoATJj7NmHTpkscuB9Y4YJNFLcnL5JCX4irHz8PCH77Uiiz4v4zNyB-kXzF3jyqC53wHvN4a57GzZdr24nv4IreQMhCEbYgHkPWg',
-      categoryIcon: Icons.local_pizza_rounded,
-      priceLevel: PriceLevel.economic,
-      facebook: 'https://facebook.com/pizzacenterlapaz',
-      instagram: 'pizzacenter.bo',
-      tiktok: 'pizzacenterbo',
-      website: 'https://pizzacenter.bo',
-    ),
-    const BusinessModel(
-      id: 'biz_4',
-      name: 'BODY XTREME FITNESS',
-      category: 'Deporte',
-      description: 'Clases grupales de crossfit, zumba y entrenamiento funcional.',
-      address: 'Av. Pando',
-      distance: '2.8 km de ti',
-      distanceKm: 2.8,
-      latitude: -16.5220,
-      longitude: -68.1380,
-      rating: 4.0,
-      reviewsCount: 24,
-      isOpen: true,
-      closingTime: '19:00',
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuDmTcgLLNYv43d95Ah0SK9RyrpIBbzLgLR0RgfwMW9_O6sBTgmuq6bkiKuakecmuBTvaokLgbHH2hWKuXBw34XEp0Oz80Twq6gCdAHlMw7IpHJyUEzow0VNzNw3qe_IaQerPh1a1fbX0u4ULUOBsKvP2gcI_7ozszJMnOXsGjxEQD28c9VxtWNaSH2V8zxrBSSLw61kLzlX3f60P_w363P-XtTuVL3-sPMjenhUYlRi9UzIc5FEZ1xMtw',
-      categoryIcon: Icons.fitness_center_rounded,
-      priceLevel: PriceLevel.premium,
-      facebook: 'https://facebook.com/bodyxtremefitness',
-      instagram: 'bodyxtreme.fitness',
-      tiktok: 'bodyxtremefitness',
-      website: 'https://bodyxtreme.com',
-    ),
-    const BusinessModel(
-      id: 'biz_5',
-      name: 'CAFÉ DEL VALLE',
-      category: 'Comida',
-      description: 'Café de especialidad de altura, pastelería artesanal y brunch.',
-      address: 'Calle 21 de Calacoto',
-      distance: '3.5 km de ti',
-      distanceKm: 3.5,
-      latitude: -16.5280,
-      longitude: -68.1420,
-      rating: 4.7,
-      reviewsCount: 45,
-      isOpen: true,
-      closingTime: '21:00',
-      promoBadge: 'DESAYUNO',
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuDa_GjJLeIkJpaN8Aq5F5gwAFE80r0L6l-4e3R0v2b4uMTgNAQYafhjr4kCyoH9ITj3n377qDs7FMrhg9TVYivy691f9XwS15nObZYssq5R8JomhyCK-Mo4wLPqFthSOdrBWQMc4_7djZn-pABc8MsYzk93dReSeLambeqJl7Y31VlJegBLi7AXEbzdhpmBJT3Dif5aSSXLw9QxSOFNYuNkIGNOqasEWTVW_f4EqrZSJMskF8s_aC3m3g',
-      categoryIcon: Icons.local_cafe_rounded,
-      priceLevel: PriceLevel.medium,
-      facebook: 'https://facebook.com/cafedelvallebolivia',
-      instagram: 'cafedelvalle.bo',
-      tiktok: 'cafedelvallebo',
-      website: 'https://cafedelvalle.bo',
-    ),
-    const BusinessModel(
-      id: 'biz_6',
-      name: 'SPA & WELLNESS ILLIMANI',
-      category: 'Salud',
-      description: 'Masajes relajantes, sauna seco y tratamientos faciales holísticos.',
-      address: 'Av. Ballivián',
-      distance: '4.8 km de ti',
-      distanceKm: 4.8,
-      latitude: -16.5380,
-      longitude: -68.1500,
-      rating: 4.9,
-      reviewsCount: 62,
-      isOpen: false,
-      closingTime: '20:00',
-      imageUrl:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuBa_lzu6msUQhDmn4b8jiPIAl_Mbt2ppNQX3wm6R9F2hvLZsAbnx2hnyZMlH9H2tNNuhoHFPzoITFHXauAW15eiHKus6zIxcv59pZ0mXNXjUL4MQjsKvHNnoAXivbyqOY8edg7eV3v7FWvuOZ01xIU8N3AMyCpN64xUAr2zF0RWfVh3iTc24T_L0vmPbw880l1s1CYmJyV-nrp9gFs5RhEmSLKrU4FUDAPpQ6O56yXlsubGgg0Rm6Jnwg',
-      categoryIcon: Icons.spa_rounded,
-      priceLevel: PriceLevel.premium,
-      facebook: 'https://facebook.com/spaillimanilp',
-      instagram: 'spaillimani.bo',
-      tiktok: 'spaillimani',
-      website: 'https://spaillimani.bo',
-    ),
-  ];
+  String _normalize(String s) {
+    return s
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n')
+        .trim();
+  }
 
   List<BusinessModel> get _filteredBusinesses {
-    final query = _searchController.text.trim().toLowerCase();
+    final query = _normalize(_searchController.text);
     final double userLat =
         _userPosition?.latitude ?? GoogleMapsConfig.defaultLatitude;
     final double userLng =
@@ -243,12 +140,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 2. Filtrar por búsqueda y criterios de filtro (incluyendo distancia máxima)
     final filtered = businessesWithDistance.where((b) {
-      // Búsqueda por texto
+      // Búsqueda por texto (nombre, categoría, descripción, dirección)
       if (query.isNotEmpty) {
-        final matchName = b.name.toLowerCase().contains(query);
-        final matchCat = b.category.toLowerCase().contains(query);
-        final matchDesc = b.description.toLowerCase().contains(query);
-        if (!matchName && !matchCat && !matchDesc) return false;
+        final matchName = _normalize(b.name).contains(query);
+        final matchCat = _normalize(b.category).contains(query);
+        final matchDesc = _normalize(b.description).contains(query);
+        final matchAddress = _normalize(b.address).contains(query);
+        if (!matchName && !matchCat && !matchDesc && !matchAddress) return false;
       }
 
       // Criterios de filtro combinados (distancia <= maxDistanceKm, abierto, ofertas, precio)
@@ -263,7 +161,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    BusinessService.instance.businessUpdatesNotifier.removeListener(_loadBusinesses);
     super.dispose();
   }
 
@@ -360,61 +260,68 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildMainHomeFeed() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSearching = _searchController.text.trim().isNotEmpty;
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Search Input
-          SearchBarWidget(
-            controller: _searchController,
-            hintText: '¿Qué buscas hoy en $_selectedCity?',
-          ),
-          const SizedBox(height: 6),
+    return RefreshIndicator(
+      onRefresh: _loadBusinesses,
+      color: AppColors.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Search Input
+            SearchBarWidget(
+              controller: _searchController,
+              hintText: '¿Qué buscas hoy en $_selectedCity?',
+            ),
+            const SizedBox(height: 6),
 
-          // Categories Horizontal Row
-          CategoryCarousel(
-            onCategoryTap: _onCategorySelected,
-          ),
-          const SizedBox(height: 6),
+            // Categories Horizontal Row
+            CategoryCarousel(
+              onCategoryTap: _onCategorySelected,
+            ),
+            const SizedBox(height: 6),
 
-          // Flash Offers Carousel
-          const FlashOffersCarousel(),
-          const SizedBox(height: 8),
+            // Flash Offers Carousel
+            const FlashOffersCarousel(),
+            const SizedBox(height: 8),
 
-          // Quick Filters (Filtros(1).png)
-          QuickFilterChips(
-            criteria: _filterCriteria,
-            onCriteriaChanged: (newCriteria) {
-              setState(() {
-                _filterCriteria = newCriteria;
-              });
-            },
-          ),
-          const SizedBox(height: 12),
+            // Quick Filters (Filtros(1).png)
+            QuickFilterChips(
+              criteria: _filterCriteria,
+              onCriteriaChanged: (newCriteria) {
+                setState(() {
+                  _filterCriteria = newCriteria;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
 
-          // Section Title: Negocios cerca de ti
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.location_on_rounded,
-                  color: Color(0xFFEF4444),
-                  size: 20,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Negocios cerca de ti',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : AppColors.textMain,
-                    letterSpacing: -0.2,
+            // Section Title: Negocios cerca de ti / Resultados de búsqueda
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    isSearching ? Icons.search_rounded : Icons.location_on_rounded,
+                    color: isSearching
+                        ? (isDark ? const Color(0xFFC084FC) : AppColors.primary)
+                        : const Color(0xFFEF4444),
+                    size: 20,
                   ),
-                ),
-                if (_filterCriteria.hasActiveFilters) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    isSearching ? 'Resultados de búsqueda' : 'Negocios cerca de ti',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : AppColors.textMain,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -426,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '${_filteredBusinesses.length} resultados',
+                      '${_filteredBusinesses.length} ${_filteredBusinesses.length == 1 ? "local" : "locales"}',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -435,125 +342,177 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-
-          // Business Cards List or Empty State
-          if (_filteredBusinesses.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
-              child: Column(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E1B24) : const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.filter_alt_off_rounded,
-                      size: 32,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    'No encontramos negocios con estos filtros',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : const Color(0xFF1F2937),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Prueba ampliando la distancia o desactivando filtros.',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _filterCriteria.clear();
-                        _searchController.clear();
-                      });
-                    },
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Limpiar todos los filtros'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
               ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _filteredBusinesses.length,
-              itemBuilder: (context, index) {
-                final b = _filteredBusinesses[index];
-                return BusinessCardItem(
-                  business: b,
-                  onFavoriteToggle: (isFav) => _onFavoriteToggled(b.id, isFav),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => BusinessProfileScreen(
-                          business: b,
-                          onFavoriteToggle: (isFav) => _onFavoriteToggled(b.id, isFav),
+            ),
+
+            // Business Cards List, Loading State, or Empty State
+            if (_isLoadingBusinesses && _businesses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(color: AppColors.primary),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Cargando comercios desde Supabase...',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              )
+            else if (_filteredBusinesses.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E1B24) : const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.filter_alt_off_rounded,
+                        size: 32,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      isSearching
+                          ? 'No encontramos locales que coincidan con "${_searchController.text}"'
+                          : 'No encontramos negocios con estos filtros',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF1F2937),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Prueba buscando por otro término o ampliando los filtros.',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _filterCriteria.clear();
+                          _searchController.clear();
+                        });
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Limpiar búsqueda y filtros'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              // Primeros 3 negocios
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _filteredBusinesses.length > 3 ? 3 : _filteredBusinesses.length,
+                itemBuilder: (context, index) {
+                  final b = _filteredBusinesses[index];
+                  final isLastOfGroup = index == (_filteredBusinesses.length > 3 ? 2 : _filteredBusinesses.length - 1);
+                  return BusinessCardItem(
+                    business: b,
+                    showDivider: !isLastOfGroup,
+                    onFavoriteToggle: (isFav) => _onFavoriteToggled(b.id, isFav),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => BusinessProfileScreen(
+                            business: b,
+                            onFavoriteToggle: (isFav) => _onFavoriteToggled(b.id, isFav),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+
+              // Negocios destacados (intercalado después de 3 negocios)
+              ProFeaturedSection(
+                onBusinessTap: (pro) {
+                  final matched = _businesses.firstWhere(
+                    (b) => b.name.toLowerCase().contains(pro.name.toLowerCase().split(' ').first),
+                    orElse: () => BusinessModel(
+                      id: pro.id,
+                      name: pro.name,
+                      category: 'Destacado PRO',
+                      description: 'Comercio certificado con atención premium y promociones exclusivas en Vikus.',
+                      address: 'Av. Principal',
+                      distance: pro.distance,
+                      rating: 4.9,
+                      reviewsCount: 58,
+                      isOpen: pro.isOpen,
+                      imageUrl: pro.imageUrl,
+                    ),
+                  );
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => BusinessProfileScreen(business: matched),
+                    ),
+                  );
+                },
+              ),
+
+              // Resto de negocios (del 4to en adelante)
+              if (_filteredBusinesses.length > 3)
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _filteredBusinesses.length - 3,
+                  itemBuilder: (context, index) {
+                    final b = _filteredBusinesses[index + 3];
+                    final isLast = index == (_filteredBusinesses.length - 4);
+                    return BusinessCardItem(
+                      business: b,
+                      showDivider: !isLast,
+                      onFavoriteToggle: (isFav) => _onFavoriteToggled(b.id, isFav),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => BusinessProfileScreen(
+                              business: b,
+                              onFavoriteToggle: (isFav) => _onFavoriteToggled(b.id, isFav),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
-                );
-              },
-            ),
-
-          // PRO Featured Businesses Section
-          ProFeaturedSection(
-            onBusinessTap: (pro) {
-              final matched = _businesses.firstWhere(
-                (b) => b.name.toLowerCase().contains(pro.name.toLowerCase().split(' ').first),
-                orElse: () => BusinessModel(
-                  id: pro.id,
-                  name: pro.name,
-                  category: 'Destacado PRO',
-                  description: 'Comercio certificado con atención premium y promociones exclusivas en Vikus.',
-                  address: 'Av. Principal',
-                  distance: pro.distance,
-                  rating: 4.9,
-                  reviewsCount: 58,
-                  isOpen: pro.isOpen,
-                  imageUrl: pro.imageUrl,
                 ),
-              );
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => BusinessProfileScreen(business: matched),
-                ),
-              );
-            },
-          ),
+            ],
 
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }

@@ -274,12 +274,14 @@ class BusinessCardItem extends StatefulWidget {
   final BusinessModel business;
   final ValueChanged<bool>? onFavoriteToggle;
   final VoidCallback? onTap;
+  final bool showDivider;
 
   const BusinessCardItem({
     super.key,
     required this.business,
     this.onFavoriteToggle,
     this.onTap,
+    this.showDivider = true,
   });
 
   @override
@@ -318,271 +320,305 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1B24) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark ? const Color(0xFF2E2B36) : const Color(0xFFF3F4F6),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: isDark ? const Color(0x22000000) : const Color(0x0A000000),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left Image with Favorite Heart Button
-              Stack(
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 140,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.network(
-                      b.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) => Container(
-                        color: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          b.categoryIcon,
-                          size: 36,
-                          color: const Color(0xFF9CA3AF),
+                  // Left Image with Favorite Heart Button
+                  Stack(
+                    children: [
+                      Container(
+                        width: 114,
+                        height: 114,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          color: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(
+                          b.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stack) => Container(
+                            color: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
+                            alignment: Alignment.center,
+                            child: Icon(
+                              b.categoryIcon,
+                              size: 32,
+                              color: const Color(0xFF9CA3AF),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: GestureDetector(
+                          onTap: _toggleFavorite,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isFavorite
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              color: _isFavorite
+                                  ? const Color(0xFFEF4444)
+                                  : Colors.white,
+                              size: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: GestureDetector(
-                      onTap: _toggleFavorite,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _isFavorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: _isFavorite
-                              ? const Color(0xFFEF4444)
-                              : Colors.white,
-                          size: 16,
-                        ),
+                  const SizedBox(width: 13),
+
+                  // Right Details
+                  Expanded(
+                    child: SizedBox(
+                      height: 114,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Top group: Header, Rating Badge, Description
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Header: Icon + Name + Promo Badge
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 19,
+                                          height: 19,
+                                          decoration: BoxDecoration(
+                                            color: isDark ? const Color(0xFF334155) : const Color(0xFF475569),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            b.categoryIcon,
+                                            color: Colors.white,
+                                            size: 10.5,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Expanded(
+                                          child: Text(
+                                            b.name,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: isDark ? Colors.white : AppColors.textMain,
+                                              letterSpacing: -0.1,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (b.promoBadge != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.proOrange,
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Text(
+                                        b.promoBadge!,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+
+                              // Rating Badge & Reviews
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5.5,
+                                      vertical: 1.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF78350F).withValues(alpha: 0.4)
+                                          : const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.star_rounded,
+                                          size: 12,
+                                          color: isDark
+                                              ? const Color(0xFFFBBF24)
+                                              : const Color(0xFFD97706),
+                                        ),
+                                        const SizedBox(width: 2.5),
+                                        Text(
+                                          b.rating.toStringAsFixed(1),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: isDark
+                                                ? const Color(0xFFFBBF24)
+                                                : const Color(0xFF92400E),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '(${b.reviewsCount} opiniones)',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+
+                              // Description
+                              Text(
+                                b.description,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  color: isDark ? const Color(0xFF9CA3AF) : AppColors.textGrey,
+                                  height: 1.2,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+
+                          // Bottom group: Location & Schedule
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Location with Highlighted Distance
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_rounded,
+                                    size: 12.5,
+                                    color: Color(0xFFEF4444),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text.rich(
+                                      TextSpan(
+                                        text: '${b.address} · ',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                                        ),
+                                        children: [
+                                          TextSpan(
+                                            text: b.distance,
+                                            style: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w700,
+                                              color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2.5),
+
+                              // Schedule Status
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 5.5,
+                                    height: 5.5,
+                                    decoration: BoxDecoration(
+                                      color: b.isCurrentlyOpenNow
+                                          ? AppColors.statusOpen
+                                          : const Color(0xFFEF4444),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    b.isCurrentlyOpenNow ? 'Abierto' : 'Cerrado',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: b.isCurrentlyOpenNow
+                                          ? AppColors.statusOpen
+                                          : const Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                  Text(
+                                    ' · ${b.scheduleStatusSubtitle}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 12),
+            ),
 
-              // Right Details
-              Expanded(
-                child: SizedBox(
-                  height: 140,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Top group: Header, Stars, Description
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header: Icon + Name + Badge
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 22,
-                                      height: 22,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF475569),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        b.categoryIcon,
-                                        color: Colors.white,
-                                        size: 12,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        b.name,
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: isDark ? Colors.white : AppColors.textMain,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (b.promoBadge != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.proOrange,
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
-                                  child: Text(
-                                    b.promoBadge!,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-
-                          // Stars & Reviews
-                          Row(
-                            children: [
-                              Row(
-                                children: List.generate(5, (index) {
-                                  return Icon(
-                                    Icons.star_rounded,
-                                    size: 14,
-                                    color: index < b.rating.floor()
-                                        ? const Color(0xFFFBBF24)
-                                        : (isDark ? const Color(0xFF4B5563) : const Color(0xFFE5E7EB)),
-                                  );
-                                }),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                b.rating.toStringAsFixed(1),
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : AppColors.textMain,
-                                ),
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                '(${b.reviewsCount} opiniones)',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10.5,
-                                  color: const Color(0xFF9CA3AF),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-
-                          // Description
-                          Text(
-                            b.description,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: isDark ? const Color(0xFF9CA3AF) : AppColors.textGrey,
-                              height: 1.3,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-
-                      // Bottom group: Location & Schedule
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Location
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on_rounded,
-                                size: 14,
-                                color: Color(0xFFEF4444),
-                              ),
-                              const SizedBox(width: 3),
-                              Expanded(
-                                child: Text(
-                                  '${b.address} - ${b.distance}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-
-                          // Schedule
-                          Row(
-                            children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  color: b.isCurrentlyOpenNow
-                                      ? AppColors.statusOpen
-                                      : const Color(0xFFEF4444),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                b.isCurrentlyOpenNow ? 'Abierto' : 'Cerrado',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: b.isCurrentlyOpenNow
-                                      ? AppColors.statusOpen
-                                      : const Color(0xFFDC2626),
-                                ),
-                              ),
-                              Text(
-                                ' · ${b.scheduleStatusSubtitle}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
+            // Minimalist Divider Line with clear presence
+            if (widget.showDivider)
+              Padding(
+                padding: const EdgeInsets.only(top: 14, bottom: 4),
+                child: Container(
+                  height: 1.5,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF374151) // Gris definido para modo oscuro
+                        : const Color(0xFFCBD5E1), // Gris slate con excelente contraste para modo claro
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

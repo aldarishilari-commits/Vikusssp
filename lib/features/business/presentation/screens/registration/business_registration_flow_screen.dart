@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:aeronpulse/core/services/business_service.dart';
 import 'package:aeronpulse/core/theme/app_colors.dart';
 import 'package:aeronpulse/core/widgets/app_notification.dart';
 import 'package:aeronpulse/features/business/domain/models/business_registration_model.dart';
@@ -31,6 +32,7 @@ class BusinessRegistrationFlowScreen extends StatefulWidget {
 class _BusinessRegistrationFlowScreenState
     extends State<BusinessRegistrationFlowScreen> {
   int _currentStep = 1; // 1 to 9, plus 10 (Producto) and 11 (Servicio)
+  bool _isSaving = false;
   final BusinessRegistrationData _data = BusinessRegistrationData();
 
   void _nextStep() {
@@ -87,31 +89,90 @@ class _BusinessRegistrationFlowScreenState
     }
   }
 
-  void _finishRegistration() {
-    AppNotification.showSuccess(
-      context,
-      '¡Negocio "${_data.name.isNotEmpty ? _data.name : "Mi Negocio"}" registrado con éxito!',
-    );
+  Future<void> _finishRegistration() async {
+    setState(() {
+      _isSaving = true;
+    });
 
-    widget.onCompleted?.call();
-    Navigator.of(context).pop(_data);
+    try {
+      await BusinessService.instance.createBusiness(_data);
+
+      if (!mounted) return;
+      AppNotification.showSuccess(
+        context,
+        '¡Negocio "${_data.name.isNotEmpty ? _data.name : "Mi Negocio"}" registrado en Vikus con éxito!',
+      );
+
+      widget.onCompleted?.call();
+      Navigator.of(context).pop(_data);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSaving = false;
+      });
+      AppNotification.showError(
+        context,
+        'Error al guardar en Supabase: $e',
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _currentStep == 1,
+      canPop: _currentStep == 1 && !_isSaving,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop || _isSaving) return;
         _previousStep();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFFBF9F8),
-        body: SafeArea(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _buildCurrentStepScreen(),
-          ),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: _buildCurrentStepScreen(),
+              ),
+            ),
+            if (_isSaving)
+              Container(
+                color: Colors.black45,
+                alignment: Alignment.center,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      CircularProgressIndicator(
+                        color: AppColors.primaryAlt,
+                        strokeWidth: 3,
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Registrando tu negocio en Supabase...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1B1C1C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

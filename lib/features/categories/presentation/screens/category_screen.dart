@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../core/config/google_maps_config.dart';
+import '../../../../core/services/business_service.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../business/presentation/screens/business_profile_screen.dart';
@@ -34,12 +35,34 @@ class _CategoryScreenState extends State<CategoryScreen> {
   int _currentNavTab = 0;
   BusinessFilterCriteria _filterCriteria = BusinessFilterCriteria();
   Position? _userPosition;
+  List<BusinessModel> _businesses = [];
 
   @override
   void initState() {
     super.initState();
     _initUserLocation();
+    _loadBusinesses();
     _searchController.addListener(() => setState(() {}));
+    BusinessService.instance.businessUpdatesNotifier.addListener(_loadBusinesses);
+  }
+
+  Future<void> _loadBusinesses() async {
+    try {
+      final list = await BusinessService.instance.getBusinesses(
+        categoryId: widget.categoryId,
+      );
+      if (mounted) {
+        setState(() {
+          _businesses = list.isNotEmpty ? list : _foodBusinesses;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _businesses = _foodBusinesses;
+        });
+      }
+    }
   }
 
   Future<void> _initUserLocation() async {
@@ -203,8 +226,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
     final double userLng =
         _userPosition?.longitude ?? GoogleMapsConfig.defaultLongitude;
 
+    final baseList = _businesses.isNotEmpty ? _businesses : _foodBusinesses;
+
     // 1. Recalcular distancia real exacta para cada negocio según GPS del usuario y coordenadas registradas
-    final businessesWithDistance = _foodBusinesses.map((b) {
+    final businessesWithDistance = baseList.map((b) {
       final double distanceMeters = LocationService.calculateDistanceInMeters(
         startLatitude: userLat,
         startLongitude: userLng,
@@ -241,6 +266,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    BusinessService.instance.businessUpdatesNotifier.removeListener(_loadBusinesses);
     super.dispose();
   }
 
@@ -290,178 +316,185 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
             // Scrollable Content
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Search Bar
-                    SearchBarWidget(
-                      controller: _searchController,
-                      hintText:
-                          'Buscar en ${widget.categoryTitle.toLowerCase()}...',
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Flash Offers Carousel
-                    const FlashOffersCarousel(),
-                    const SizedBox(height: 8),
-
-                    // Quick Filter Chips (Filtros(1).png)
-                    QuickFilterChips(
-                      criteria: _filterCriteria,
-                      onCriteriaChanged: (newCriteria) {
-                        setState(() {
-                          _filterCriteria = newCriteria;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Section: Negocios cerca de ti
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 4,
+              child: RefreshIndicator(
+                onRefresh: _loadBusinesses,
+                color: AppColors.primary,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Search Bar
+                      SearchBarWidget(
+                        controller: _searchController,
+                        hintText:
+                            'Buscar en ${widget.categoryTitle.toLowerCase()}...',
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_rounded,
-                            color: Color(0xFFEF4444),
-                            size: 19,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Negocios cerca de ti',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : AppColors.textMain,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          if (_filterCriteria.hasActiveFilters) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '${_filteredBusinesses.length} resultados',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? const Color(0xFFC084FC) : AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                      const SizedBox(height: 10),
 
-                    // Food Business Cards or Empty State
-                    if (_filteredBusinesses.isEmpty)
+                      // Flash Offers Carousel
+                      const FlashOffersCarousel(),
+                      const SizedBox(height: 8),
+
+                      // Quick Filter Chips (Filtros(1).png)
+                      QuickFilterChips(
+                        criteria: _filterCriteria,
+                        onCriteriaChanged: (newCriteria) {
+                          setState(() {
+                            _filterCriteria = newCriteria;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Section: Negocios cerca de ti
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 36,
+                          horizontal: 20,
+                          vertical: 4,
                         ),
-                        child: Center(
-                          child: Column(
-                            children: [
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 19,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Negocios cerca de ti',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : AppColors.textMain,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            if (_filterCriteria.hasActiveFilters) ...[
+                              const SizedBox(width: 8),
                               Container(
-                                width: 60,
-                                height: 60,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: isDark ? AppColors.darkCard : const Color(0xFFF3F4F6),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isDark ? AppColors.darkBorder : Colors.transparent,
-                                  ),
+                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(
-                                  Icons.filter_alt_off_rounded,
-                                  size: 30,
-                                  color: isDark ? AppColors.darkTextMuted : const Color(0xFF9CA3AF),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No encontramos negocios con estos filtros',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: isDark ? Colors.white : const Color(0xFF1F2937),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Prueba ajustando la distancia o limpiando filtros.',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF6B7280),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 14),
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _filterCriteria.clear();
-                                    _searchController.clear();
-                                  });
-                                },
-                                icon: const Icon(Icons.refresh_rounded, size: 16),
-                                label: const Text('Limpiar filtros'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                child: Text(
+                                  '${_filteredBusinesses.length} resultados',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? const Color(0xFFC084FC) : AppColors.primary,
                                   ),
                                 ),
                               ),
                             ],
-                          ),
+                          ],
                         ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _filteredBusinesses.length,
-                        itemBuilder: (context, index) {
-                          final b = _filteredBusinesses[index];
-                          return BusinessCardItem(
-                            business: b,
-                            onFavoriteToggle: (isFav) =>
-                                _onFavoriteToggled(b.id, isFav),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => BusinessProfileScreen(
-                                    business: b,
-                                    onFavoriteToggle: (isFav) =>
-                                        _onFavoriteToggled(b.id, isFav),
+                      ),
+
+                      // Food Business Cards or Empty State
+                      if (_filteredBusinesses.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 36,
+                          ),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: isDark ? AppColors.darkCard : const Color(0xFFF3F4F6),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isDark ? AppColors.darkBorder : Colors.transparent,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.filter_alt_off_rounded,
+                                    size: 30,
+                                    color: isDark ? AppColors.darkTextMuted : const Color(0xFF9CA3AF),
                                   ),
                                 ),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No encontramos negocios con estos filtros',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: isDark ? Colors.white : const Color(0xFF1F2937),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Prueba ajustando la distancia o limpiando filtros.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF6B7280),
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 14),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _filterCriteria.clear();
+                                      _searchController.clear();
+                                    });
+                                  },
+                                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                                  label: const Text('Limpiar filtros'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _filteredBusinesses.length,
+                          itemBuilder: (context, index) {
+                            final b = _filteredBusinesses[index];
+                            final isLast = index == _filteredBusinesses.length - 1;
+                            return BusinessCardItem(
+                              business: b,
+                              showDivider: !isLast,
+                              onFavoriteToggle: (isFav) =>
+                                  _onFavoriteToggled(b.id, isFav),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => BusinessProfileScreen(
+                                      business: b,
+                                      onFavoriteToggle: (isFav) =>
+                                          _onFavoriteToggled(b.id, isFav),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
 
                     // PRO Featured Section
                     ProFeaturedSection(
@@ -495,9 +528,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 ),
               ),
             ),
+          ),
 
-            // Bottom Navigation Bar
-            CustomBottomNavBar(
+          // Bottom Navigation Bar
+          CustomBottomNavBar(
               currentIndex: _currentNavTab,
               onTabSelected: (index) {
                 if (index == 0) {
