@@ -328,14 +328,14 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left Image with Favorite Heart Button
+                  // Left Image with Favorite Heart Button (Perfect 1:1 Square)
                   Stack(
                     children: [
                       Container(
-                        width: 122,
-                        height: 132,
+                        width: 124,
+                        height: 124,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(16),
                           color: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
                         ),
                         clipBehavior: Clip.antiAlias,
@@ -347,20 +347,20 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                             alignment: Alignment.center,
                             child: Icon(
                               b.categoryIcon,
-                              size: 36,
+                              size: 34,
                               color: const Color(0xFF9CA3AF),
                             ),
                           ),
                         ),
                       ),
                       Positioned(
-                        top: 7,
-                        right: 7,
+                        top: 6,
+                        right: 6,
                         child: GestureDetector(
                           onTap: _toggleFavorite,
                           child: Container(
-                            width: 30,
-                            height: 30,
+                            width: 28,
+                            height: 28,
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.42),
                               shape: BoxShape.circle,
@@ -372,7 +372,7 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                               color: _isFavorite
                                   ? const Color(0xFFEF4444)
                                   : Colors.white,
-                              size: 16,
+                              size: 15,
                             ),
                           ),
                         ),
@@ -384,7 +384,7 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                   // Right Details
                   Expanded(
                     child: SizedBox(
-                      height: 132,
+                      height: 124,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
