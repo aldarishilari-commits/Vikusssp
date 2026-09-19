@@ -448,6 +448,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             final b = businesses[i];
             return BusinessCardItem(
               business: b,
+              showDivider: i < businesses.length - 1,
               onFavoriteToggle: (isFav) {
                 favService.toggleBusinessFavorite(b, context);
               },

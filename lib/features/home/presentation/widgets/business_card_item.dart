@@ -332,10 +332,10 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                   Stack(
                     children: [
                       Container(
-                        width: 114,
-                        height: 114,
+                        width: 122,
+                        height: 132,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(18),
                           color: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
                         ),
                         clipBehavior: Clip.antiAlias,
@@ -347,22 +347,22 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                             alignment: Alignment.center,
                             child: Icon(
                               b.categoryIcon,
-                              size: 32,
+                              size: 36,
                               color: const Color(0xFF9CA3AF),
                             ),
                           ),
                         ),
                       ),
                       Positioned(
-                        top: 6,
-                        right: 6,
+                        top: 7,
+                        right: 7,
                         child: GestureDetector(
                           onTap: _toggleFavorite,
                           child: Container(
-                            width: 28,
-                            height: 28,
+                            width: 30,
+                            height: 30,
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.4),
+                              color: Colors.black.withValues(alpha: 0.42),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -372,19 +372,19 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                               color: _isFavorite
                                   ? const Color(0xFFEF4444)
                                   : Colors.white,
-                              size: 15,
+                              size: 16,
                             ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(width: 13),
+                  const SizedBox(width: 14),
 
                   // Right Details
                   Expanded(
                     child: SizedBox(
-                      height: 114,
+                      height: 132,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -402,8 +402,8 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                     child: Row(
                                       children: [
                                         Container(
-                                          width: 19,
-                                          height: 19,
+                                          width: 21,
+                                          height: 21,
                                           decoration: BoxDecoration(
                                             color: isDark ? const Color(0xFF334155) : const Color(0xFF475569),
                                             shape: BoxShape.circle,
@@ -411,18 +411,18 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                           child: Icon(
                                             b.categoryIcon,
                                             color: Colors.white,
-                                            size: 10.5,
+                                            size: 11.5,
                                           ),
                                         ),
-                                        const SizedBox(width: 5),
+                                        const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
                                             b.name,
                                             style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 13.5,
+                                              fontSize: 14.5,
                                               fontWeight: FontWeight.w800,
                                               color: isDark ? Colors.white : AppColors.textMain,
-                                              letterSpacing: -0.1,
+                                              letterSpacing: -0.2,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -434,12 +434,12 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                   if (b.promoBadge != null)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
+                                        horizontal: 7,
+                                        vertical: 2.5,
                                       ),
                                       decoration: BoxDecoration(
                                         color: AppColors.proOrange,
-                                        borderRadius: BorderRadius.circular(5),
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
                                         b.promoBadge!,
@@ -453,37 +453,37 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                     ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 5),
 
                               // Rating Badge & Reviews
                               Row(
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 5.5,
-                                      vertical: 1.5,
+                                      horizontal: 6.5,
+                                      vertical: 2,
                                     ),
                                     decoration: BoxDecoration(
                                       color: isDark
-                                          ? const Color(0xFF78350F).withValues(alpha: 0.4)
+                                          ? const Color(0xFF78350F).withValues(alpha: 0.45)
                                           : const Color(0xFFFEF3C7),
-                                      borderRadius: BorderRadius.circular(5),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
                                           Icons.star_rounded,
-                                          size: 12,
+                                          size: 13,
                                           color: isDark
                                               ? const Color(0xFFFBBF24)
                                               : const Color(0xFFD97706),
                                         ),
-                                        const SizedBox(width: 2.5),
+                                        const SizedBox(width: 3),
                                         Text(
                                           b.rating.toStringAsFixed(1),
                                           style: GoogleFonts.inter(
-                                            fontSize: 10.5,
+                                            fontSize: 11.5,
                                             fontWeight: FontWeight.w800,
                                             color: isDark
                                                 ? const Color(0xFFFBBF24)
@@ -493,26 +493,26 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 5),
+                                  const SizedBox(width: 6),
                                   Text(
                                     '(${b.reviewsCount} opiniones)',
                                     style: GoogleFonts.inter(
-                                      fontSize: 10.5,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w500,
                                       color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 4),
 
                               // Description
                               Text(
                                 b.description,
                                 style: GoogleFonts.inter(
-                                  fontSize: 10.5,
+                                  fontSize: 11.5,
                                   color: isDark ? const Color(0xFF9CA3AF) : AppColors.textGrey,
-                                  height: 1.2,
+                                  height: 1.3,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -529,16 +529,16 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                 children: [
                                   const Icon(
                                     Icons.location_on_rounded,
-                                    size: 12.5,
+                                    size: 13.5,
                                     color: Color(0xFFEF4444),
                                   ),
-                                  const SizedBox(width: 3),
+                                  const SizedBox(width: 3.5),
                                   Expanded(
                                     child: Text.rich(
                                       TextSpan(
                                         text: '${b.address} · ',
                                         style: GoogleFonts.inter(
-                                          fontSize: 10.5,
+                                          fontSize: 11.5,
                                           fontWeight: FontWeight.w500,
                                           color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                         ),
@@ -558,14 +558,14 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 2.5),
+                              const SizedBox(height: 3),
 
                               // Schedule Status
                               Row(
                                 children: [
                                   Container(
-                                    width: 5.5,
-                                    height: 5.5,
+                                    width: 6,
+                                    height: 6,
                                     decoration: BoxDecoration(
                                       color: b.isCurrentlyOpenNow
                                           ? AppColors.statusOpen
@@ -573,11 +573,11 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                       shape: BoxShape.circle,
                                     ),
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 4.5),
                                   Text(
                                     b.isCurrentlyOpenNow ? 'Abierto' : 'Cerrado',
                                     style: GoogleFonts.inter(
-                                      fontSize: 10.5,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                       color: b.isCurrentlyOpenNow
                                           ? AppColors.statusOpen
@@ -587,7 +587,7 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                   Text(
                                     ' · ${b.scheduleStatusSubtitle}',
                                     style: GoogleFonts.inter(
-                                      fontSize: 10.5,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w500,
                                       color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                     ),
@@ -607,7 +607,7 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
             // Minimalist Divider Line with clear presence
             if (widget.showDivider)
               Padding(
-                padding: const EdgeInsets.only(top: 14, bottom: 4),
+                padding: const EdgeInsets.only(top: 16, bottom: 4),
                 child: Container(
                   height: 1.5,
                   decoration: BoxDecoration(

@@ -131,7 +131,7 @@ class ProFeaturedSection extends StatelessWidget {
                             Stack(
                               children: [
                                 Container(
-                                  height: 125,
+                                  height: 130,
                                   width: double.infinity,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(18),
@@ -182,7 +182,7 @@ class ProFeaturedSection extends StatelessWidget {
                             Text(
                               item.name,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12.5,
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.w800,
                                 color: isDark ? Colors.white : AppColors.textMain,
                               ),
@@ -199,14 +199,15 @@ class ProFeaturedSection extends StatelessWidget {
                                   children: [
                                     const Icon(
                                       Icons.location_on_rounded,
-                                      size: 11,
+                                      size: 12,
                                       color: Color(0xFFEF4444),
                                     ),
-                                    const SizedBox(width: 2),
+                                    const SizedBox(width: 2.5),
                                     Text(
                                       item.distance,
                                       style: GoogleFonts.inter(
-                                        fontSize: 10,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
                                         color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                       ),
                                     ),
@@ -215,18 +216,18 @@ class ProFeaturedSection extends StatelessWidget {
                                 Row(
                                   children: [
                                     Container(
-                                      width: 5,
-                                      height: 5,
+                                      width: 5.5,
+                                      height: 5.5,
                                       decoration: const BoxDecoration(
                                         color: AppColors.statusOpen,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
-                                    const SizedBox(width: 3),
+                                    const SizedBox(width: 3.5),
                                     Text(
                                       'Abierto',
                                       style: GoogleFonts.inter(
-                                        fontSize: 10,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.statusOpen,
                                       ),
