@@ -317,25 +317,25 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: GestureDetector(
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Left Image Thumbnail (Reference: 88x88 rounded square with badge)
+                  // Left Image with Favorite Heart Button
                   Stack(
                     children: [
                       Container(
-                        width: 88,
-                        height: 88,
+                        width: 122,
+                        height: 132,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(18),
                           color: isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB),
                         ),
                         clipBehavior: Clip.antiAlias,
@@ -347,49 +347,22 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                             alignment: Alignment.center,
                             child: Icon(
                               b.categoryIcon,
-                              size: 32,
+                              size: 36,
                               color: const Color(0xFF9CA3AF),
                             ),
                           ),
                         ),
                       ),
-                      // Top Left Badge (like reference pink lightning badge)
-                      if (b.promoBadge == 'PRO')
-                        Positioned(
-                          top: 5,
-                          left: 5,
-                          child: Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              color: AppColors.proOrange,
-                              borderRadius: BorderRadius.circular(6),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x33000000),
-                                  blurRadius: 3,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.bolt_rounded,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                          ),
-                        ),
-                      // Top Right Favorite Button
                       Positioned(
-                        top: 5,
-                        right: 5,
+                        top: 7,
+                        right: 7,
                         child: GestureDetector(
                           onTap: _toggleFavorite,
                           child: Container(
-                            width: 26,
-                            height: 26,
+                            width: 30,
+                            height: 30,
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.38),
+                              color: Colors.black.withValues(alpha: 0.42),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -399,7 +372,7 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                               color: _isFavorite
                                   ? const Color(0xFFEF4444)
                                   : Colors.white,
-                              size: 14,
+                              size: 16,
                             ),
                           ),
                         ),
@@ -408,176 +381,187 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                   ),
                   const SizedBox(width: 14),
 
-                  // Right Details (Matches reference: Top Name + Badge, Middle Desc, Bottom Info)
+                  // Right Details
                   Expanded(
                     child: SizedBox(
-                      height: 88,
+                      height: 132,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // 1. Top Row: Business Name + Right Pill Badge (like reference "NEW" cyan pill)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                          // Top group: Header, Rating Badge, Description
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  b.name,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: isDark ? Colors.white : const Color(0xFF111827),
-                                    letterSpacing: -0.2,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              if (b.promoBadge != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2.5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: b.promoBadge == 'PRO'
-                                        ? AppColors.proOrange
-                                        : const Color(0xFF06B6D4), // Cyan pill like reference
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    b.promoBadge!,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: 0.3,
+                              // Header: Icon + Name + Promo Badge
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 21,
+                                          height: 21,
+                                          decoration: BoxDecoration(
+                                            color: isDark ? const Color(0xFF334155) : const Color(0xFF475569),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            b.categoryIcon,
+                                            color: Colors.white,
+                                            size: 11.5,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            b.name,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 14.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: isDark ? Colors.white : AppColors.textMain,
+                                              letterSpacing: -0.2,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                )
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? const Color(0xFF334155)
-                                        : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        b.categoryIcon,
-                                        size: 10.5,
-                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  if (b.promoBadge != null)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 2.5,
                                       ),
-                                      const SizedBox(width: 3.5),
-                                      Text(
-                                        b.category,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.proOrange,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        b.promoBadge!,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 0.3,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
 
-                          // 2. Middle Row: Short Description
-                          Text(
-                            b.description,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF4B5563),
-                              height: 1.25,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-
-                          // 3. Bottom Row: Metadata Tags (Rating, Distance, Schedule)
-                          Row(
-                            children: [
-                              // Rating
+                              // Rating Badge & Reviews
                               Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.star_rounded,
-                                    size: 14,
-                                    color: Color(0xFFF59E0B),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    b.rating.toStringAsFixed(1),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: isDark ? Colors.white : const Color(0xFF111827),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6.5,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF78350F).withValues(alpha: 0.45)
+                                          : const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.star_rounded,
+                                          size: 13,
+                                          color: isDark
+                                              ? const Color(0xFFFBBF24)
+                                              : const Color(0xFFD97706),
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          b.rating.toStringAsFixed(1),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: isDark
+                                                ? const Color(0xFFFBBF24)
+                                                : const Color(0xFF92400E),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    ' (${b.reviewsCount})',
+                                    '(${b.reviewsCount} opiniones)',
                                     style: GoogleFonts.inter(
-                                      fontSize: 10.5,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w500,
                                       color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '·',
-                                style: TextStyle(
-                                  color: isDark ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 4),
 
-                              // Location / Distance
+                              // Description
+                              Text(
+                                b.description,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  color: isDark ? const Color(0xFF9CA3AF) : AppColors.textGrey,
+                                  height: 1.3,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+
+                          // Bottom group: Location & Schedule
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Location with Highlighted Distance
                               Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Icon(
                                     Icons.location_on_rounded,
-                                    size: 12,
+                                    size: 13.5,
                                     color: Color(0xFFEF4444),
                                   ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    b.distance,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+                                  const SizedBox(width: 3.5),
+                                  Expanded(
+                                    child: Text.rich(
+                                      TextSpan(
+                                        text: '${b.address} · ',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                                        ),
+                                        children: [
+                                          TextSpan(
+                                            text: b.distance,
+                                            style: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w700,
+                                              color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '·',
-                                style: TextStyle(
-                                  color: isDark ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 3),
 
-                              // Open / Closed Status Dot
+                              // Schedule Status
                               Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Container(
                                     width: 6,
@@ -589,15 +573,23 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
                                       shape: BoxShape.circle,
                                     ),
                                   ),
-                                  const SizedBox(width: 3.5),
+                                  const SizedBox(width: 4.5),
                                   Text(
                                     b.isCurrentlyOpenNow ? 'Abierto' : 'Cerrado',
                                     style: GoogleFonts.inter(
-                                      fontSize: 11,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                       color: b.isCurrentlyOpenNow
                                           ? AppColors.statusOpen
                                           : const Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                  Text(
+                                    ' · ${b.scheduleStatusSubtitle}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                                     ),
                                   ),
                                 ],
@@ -612,17 +604,17 @@ class _BusinessCardItemState extends State<BusinessCardItem> {
               ),
             ),
 
-            // Minimalist Divider Line matching reference
+            // Minimalist Divider Line with clear presence
             if (widget.showDivider)
               Padding(
-                padding: const EdgeInsets.only(top: 10, bottom: 2),
+                padding: const EdgeInsets.only(top: 16, bottom: 4),
                 child: Container(
-                  height: 1.0,
+                  height: 1.5,
                   decoration: BoxDecoration(
                     color: isDark
-                        ? const Color(0xFF27272A)
-                        : const Color(0xFFE5E7EB),
-                    borderRadius: BorderRadius.circular(1),
+                        ? const Color(0xFF374151) // Gris definido para modo oscuro
+                        : const Color(0xFFCBD5E1), // Gris slate con excelente contraste para modo claro
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
