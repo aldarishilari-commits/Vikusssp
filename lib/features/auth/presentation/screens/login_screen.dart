@@ -97,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (_isSignUp) {
         // Registro de usuario en Supabase
-        await AuthService().signUp(
+        final authResponse = await AuthService().signUp(
           email: _emailController.text.trim(),
           password: _passwordController.text,
           fullName: _nameController.text.trim(),
@@ -105,12 +105,29 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 ¡Cuenta creada con éxito! Bienvenido a Vikus.'),
-            backgroundColor: Color(0xFF16A34A),
-          ),
-        );
+
+        if (authResponse.session == null) {
+          // Si Supabase requiere confirmación por correo antes de iniciar sesión
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 ¡Cuenta registrada! Revisa tu correo para confirmarla o inicia sesión.'),
+              backgroundColor: Color(0xFF16A34A),
+              duration: Duration(seconds: 5),
+            ),
+          );
+          setState(() {
+            _isSignUp = false;
+            _passwordController.clear();
+          });
+          return;
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 ¡Cuenta creada con éxito! Bienvenido a Vikus.'),
+              backgroundColor: Color(0xFF16A34A),
+            ),
+          );
+        }
       } else {
         // Inicio de sesión en Supabase
         await AuthService().signIn(

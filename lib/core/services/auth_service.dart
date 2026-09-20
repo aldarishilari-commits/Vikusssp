@@ -84,6 +84,27 @@ class AuthService {
           if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
         },
       );
+
+      // Si el usuario se creó correctamente, registrar o actualizar su perfil en `profiles`
+      if (response.user != null) {
+        try {
+          await _client.from('profiles').upsert({
+            'id': response.user!.id,
+            'full_name': fullName.trim(),
+            'phone': phone?.trim() ?? '',
+            'email': email.trim(),
+            'city': 'Pando',
+            'notify_all': true,
+            'notify_new_offers': true,
+            'notify_expiring_offers': true,
+            'notify_important_messages': true,
+            'updated_at': DateTime.now().toIso8601String(),
+          });
+        } catch (profileError) {
+          debugPrint('Aviso: el perfil se creará/sincronizará al iniciar sesión: $profileError');
+        }
+      }
+
       return response;
     } on AuthException catch (e) {
       debugPrint('Error en signUp: ${e.message}');
@@ -225,8 +246,11 @@ class AuthService {
     if (msg.contains('password should be at least')) {
       return Exception('La contraseña debe tener al menos 6 caracteres.');
     }
-    if (msg.contains('invalid email')) {
+    if (msg.contains('invalid email') || msg.contains('email_address_invalid')) {
       return Exception('El formato del correo electrónico no es válido.');
+    }
+    if (msg.contains('rate limit') || msg.contains('over_email_send_rate_limit')) {
+      return Exception('Has alcanzado el límite de intentos de registro. Espera unos minutos e intenta de nuevo.');
     }
     if (msg.contains('network') || msg.contains('timeout')) {
       return Exception('Problema de conexión con el servidor. Revisa tu internet.');
