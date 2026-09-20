@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -67,7 +69,7 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Selecciona fotos de la fachada, interior o menú para mostrar tu local.',
+                  'Selecciona fotos de la fachada, interior o productos para tu local.',
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     color: const Color(0xFF6B7280),
@@ -167,14 +169,17 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
         _uploadStatus = 'Subiendo foto a Supabase...';
       });
 
-      final url = await StorageService.instance.uploadBusinessPhoto(file: picked);
+      final uploadedUrl = await StorageService.instance.uploadBusinessPhoto(
+        file: picked,
+        businessId: widget.data.id,
+      );
 
       if (mounted) {
         setState(() {
-          widget.data.photoUrls.add(url);
+          widget.data.photoUrls.add(uploadedUrl);
           _isUploading = false;
         });
-        AppNotification.showSuccess(context, 'Foto subida correctamente');
+        AppNotification.showSuccess(context, 'Foto subida y guardada');
       }
     } catch (e) {
       debugPrint('Error al capturar foto con cámara: $e');
@@ -184,7 +189,7 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
         });
         AppNotification.showError(
           context,
-          'No se pudo subir la foto. ${e.toString().replaceAll('Exception: ', '')}',
+          'No se pudo subir la foto: ${e.toString().replaceAll('Exception: ', '')}',
         );
       }
     }
@@ -206,6 +211,7 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
 
       final uploadedUrls = await StorageService.instance.uploadMultipleBusinessPhotos(
         files: pickedFiles,
+        businessId: widget.data.id,
         onProgress: (current, total) {
           if (mounted) {
             setState(() {
@@ -222,7 +228,7 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
         });
         AppNotification.showSuccess(
           context,
-          '${uploadedUrls.length} ${uploadedUrls.length == 1 ? "foto agregada" : "fotos agregadas"}',
+          '${uploadedUrls.length} ${uploadedUrls.length == 1 ? "foto subida" : "fotos subidas"}',
         );
       }
     } catch (e) {
@@ -233,7 +239,7 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
         });
         AppNotification.showError(
           context,
-          'Error al subir fotos. ${e.toString().replaceAll('Exception: ', '')}',
+          'Error al subir fotos: ${e.toString().replaceAll('Exception: ', '')}',
         );
       }
     }
@@ -241,10 +247,59 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
 
   void _removePhoto(int index) {
     if (index >= 0 && index < widget.data.photoUrls.length) {
+      final removedUrl = widget.data.photoUrls[index];
       setState(() {
         widget.data.photoUrls.removeAt(index);
       });
+      StorageService.instance.deleteBusinessPhotoByUrl(removedUrl);
       AppNotification.showInfo(context, 'Foto eliminada');
+    }
+  }
+
+  Widget _buildPhotoWidget(String pathOrUrl, {BoxFit fit = BoxFit.cover}) {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return Image.network(
+        pathOrUrl,
+        fit: fit,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(
+            child: CircularProgressIndicator(
+              color: AppColors.primaryAlt,
+              strokeWidth: 2.5,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => const Center(
+          child: Icon(
+            Icons.broken_image_rounded,
+            size: 36,
+            color: Color(0xFF9CA3AF),
+          ),
+        ),
+      );
+    } else {
+      if (!kIsWeb) {
+        return Image.file(
+          File(pathOrUrl),
+          fit: fit,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Icon(
+              Icons.broken_image_rounded,
+              size: 36,
+              color: Color(0xFF9CA3AF),
+            ),
+          ),
+        );
+      } else {
+        return const Center(
+          child: Icon(
+            Icons.photo_rounded,
+            size: 36,
+            color: Color(0xFF9CA3AF),
+          ),
+        );
+      }
     }
   }
 
@@ -306,26 +361,7 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
                     // Primary cover photo
                     ClipRRect(
                       borderRadius: BorderRadius.circular(15),
-                      child: Image.network(
-                        widget.data.photoUrls.first,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return const Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.primaryAlt,
-                              strokeWidth: 2.5,
-                            ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(
-                            Icons.broken_image_rounded,
-                            size: 48,
-                            color: Color(0xFF9CA3AF),
-                          ),
-                        ),
-                      ),
+                      child: _buildPhotoWidget(widget.data.photoUrls.first),
                     ),
                     // Badge "Foto de portada"
                     Positioned(
@@ -563,13 +599,7 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            photoUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (ctx, err, stack) => const Center(
-                              child: Icon(Icons.broken_image, size: 20, color: Color(0xFF9CA3AF)),
-                            ),
-                          ),
+                          child: _buildPhotoWidget(photoUrl),
                         ),
                       ),
                       // Small delete badge

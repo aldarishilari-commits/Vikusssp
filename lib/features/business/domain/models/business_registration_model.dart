@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 /// Modelo de horario para cada día de la semana
 class DaySchedule {
@@ -120,6 +121,9 @@ class BusinessServiceItem {
 
 /// Modelo general que persiste todo el estado del registro a través de los 11 pasos
 class BusinessRegistrationData {
+  /// Identificador único del negocio (UUID generado para asociar fotos y recursos)
+  final String id;
+
   // Paso 2: Nombre y Descripción
   String name;
   String description;
@@ -154,6 +158,7 @@ class BusinessRegistrationData {
   List<BusinessServiceItem> services;
 
   BusinessRegistrationData({
+    String? id,
     this.name = '',
     this.description = '',
     this.category = 'Restaurantes y comida',
@@ -171,7 +176,8 @@ class BusinessRegistrationData {
     List<String>? photoUrls,
     List<BusinessProductItem>? products,
     List<BusinessServiceItem>? services,
-  })  : schedules = schedules ??
+  })  : id = id ?? const Uuid().v4(),
+        schedules = schedules ??
             {
               'Lunes': DaySchedule(dayName: 'Lunes'),
               'Martes': DaySchedule(dayName: 'Martes'),

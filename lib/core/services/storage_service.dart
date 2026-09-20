@@ -3,7 +3,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 
-/// Servicio para gestionar la subida y eliminación de imágenes en Supabase Storage
+/// Servicio para gestionar la subida y almacenamiento de imágenes en Supabase Storage
+/// utilizando estrictamente el bucket 'business-photos'.
 class StorageService {
   static final StorageService _instance = StorageService._internal();
   factory StorageService() => _instance;
@@ -13,71 +14,83 @@ class StorageService {
 
   SupabaseClient get _client => SupabaseConfig.client;
 
-  /// Lista de buckets candidatos para almacenar fotos de negocios
-  static const List<String> _candidateBuckets = [
-    'business-photos',
-    'photos',
-    'businesses',
-    'public',
-  ];
+  /// Nombre del bucket oficial en Supabase Storage
+  static const String businessPhotosBucket = 'business-photos';
 
-  /// Subir una imagen de negocio a Supabase Storage y retornar su URL pública
+  /// Sube una foto de negocio al bucket 'business-photos' en la ruta:
+  /// `<business_id>/<timestamp>_<clean_filename>`
+  /// y retorna su URL pública accesible.
   Future<String> uploadBusinessPhoto({
     required XFile file,
-    String? folder,
+    required String businessId,
   }) async {
-    final Uint8List fileBytes = await file.readAsBytes();
-    final String extension = file.name.split('.').last.toLowerCase();
-    final String mimeType = _resolveMimeType(extension);
-    final String cleanFileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')}';
-    final String path = folder != null && folder.isNotEmpty
-        ? '$folder/$cleanFileName'
-        : 'businesses/$cleanFileName';
+    try {
+      final Uint8List fileBytes = await file.readAsBytes();
+      final String extension = file.name.split('.').last.toLowerCase();
+      final String mimeType = _resolveMimeType(extension);
+      final String cleanFileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')}';
+      
+      final String sanitizedBusinessId = businessId.trim().isNotEmpty
+          ? businessId.trim()
+          : 'general';
 
-    Exception? lastException;
+      final String path = '$sanitizedBusinessId/$cleanFileName';
 
-    for (final bucket in _candidateBuckets) {
-      try {
-        await _client.storage.from(bucket).uploadBinary(
-              path,
-              fileBytes,
-              fileOptions: FileOptions(
-                contentType: mimeType,
-                upsert: true,
-              ),
-            );
+      // Subir archivo a Supabase Storage
+      await _client.storage.from(businessPhotosBucket).uploadBinary(
+            path,
+            fileBytes,
+            fileOptions: FileOptions(
+              contentType: mimeType,
+              upsert: true,
+            ),
+          );
 
-        final publicUrl = _client.storage.from(bucket).getPublicUrl(path);
-        debugPrint('✅ Imagen subida con éxito al bucket "$bucket": $publicUrl');
-        return publicUrl;
-      } catch (e) {
-        lastException = Exception(e.toString());
-        debugPrint('⚠️ Intento de subida al bucket "$bucket" falló: $e');
-        // Continuar intentando con el siguiente bucket si no se encontró
-        continue;
-      }
+      final String publicUrl = _client.storage.from(businessPhotosBucket).getPublicUrl(path);
+      debugPrint('✅ [StorageService] Foto subida exitosamente a "$businessPhotosBucket": $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      debugPrint('❌ [StorageService] Error al subir foto a Supabase Storage: $e');
+      rethrow;
     }
-
-    // Si fallan los buckets específicos, lanzar error descriptivo
-    throw Exception(
-      'No se pudo subir la imagen a Supabase Storage. '
-      'Verifica que exista un bucket público (ej. "business-photos" o "photos") en tu proyecto de Supabase. '
-      'Detalle: ${lastException?.toString() ?? "Error desconocido"}',
-    );
   }
 
   /// Sube múltiples fotos secuencialmente con callback de progreso
   Future<List<String>> uploadMultipleBusinessPhotos({
     required List<XFile> files,
+    required String businessId,
     void Function(int current, int total)? onProgress,
   }) async {
-    final List<String> uploadedUrls = [];
+    final List<String> resultUrls = [];
     for (int i = 0; i < files.length; i++) {
       onProgress?.call(i + 1, files.length);
-      final url = await uploadBusinessPhoto(file: files[i]);
-      uploadedUrls.add(url);
+      final url = await uploadBusinessPhoto(
+        file: files[i],
+        businessId: businessId,
+      );
+      resultUrls.add(url);
     }
-    return uploadedUrls;
+    return resultUrls;
+  }
+
+  /// Elimina una foto de Supabase Storage a partir de su URL pública o path
+  Future<void> deleteBusinessPhotoByUrl(String photoUrl) async {
+    try {
+      final uri = Uri.tryParse(photoUrl);
+      if (uri == null) return;
+
+      // Extraer la ruta dentro del bucket (después de /business-photos/)
+      final pathSegments = uri.pathSegments;
+      final bucketIndex = pathSegments.indexOf(businessPhotosBucket);
+      if (bucketIndex != -1 && bucketIndex + 1 < pathSegments.length) {
+        final storagePath = pathSegments.sublist(bucketIndex + 1).join('/');
+        await _client.storage.from(businessPhotosBucket).remove([storagePath]);
+        debugPrint('🗑️ [StorageService] Foto eliminada de storage: $storagePath');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [StorageService] No se pudo eliminar foto de storage: $e');
+    }
   }
 
   /// Determina el tipo MIME adecuado según la extensión del archivo

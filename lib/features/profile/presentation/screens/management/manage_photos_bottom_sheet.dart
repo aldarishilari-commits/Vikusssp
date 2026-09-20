@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../../core/services/business_service.dart';
+import '../../../../../core/services/storage_service.dart';
 
 class ManagePhotosBottomSheet extends StatefulWidget {
   final String businessId;
@@ -43,6 +45,7 @@ class ManagePhotosBottomSheet extends StatefulWidget {
 class _ManagePhotosBottomSheetState extends State<ManagePhotosBottomSheet> {
   late List<BusinessPhotoModel> _photos;
   bool _isLoading = false;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -60,99 +63,153 @@ class _ManagePhotosBottomSheetState extends State<ManagePhotosBottomSheet> {
     }
   }
 
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+
+      if (file == null) return;
+
+      setState(() => _isLoading = true);
+
+      final uploadedUrl = await StorageService.instance.uploadBusinessPhoto(
+        file: file,
+        businessId: widget.businessId,
+      );
+
+      await BusinessService.instance.addBusinessPhoto(widget.businessId, uploadedUrl);
+      await _reloadPhotos();
+      widget.onUpdated();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto subida exitosamente a Supabase')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al subir foto: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _openAddPhotoDialog() {
-    final urlCtrl = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? const Color(0xFF1E1B24) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF1E1B24) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.add_photo_alternate_rounded, color: Color(0xFF3B82F6), size: 20),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Agregar Foto',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : const Color(0xFF1B1C1C),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: urlCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'URL de la imagen *',
-                  hintText: 'https://images.unsplash.com/...',
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ActionChip(
-                    label: const Text('Ejemplo Local'),
-                    onPressed: () {
-                      urlCtrl.text = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&q=80';
-                    },
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF3F3D47) : const Color(0xFFE5E0EA),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  ActionChip(
-                    label: const Text('Ejemplo Comida'),
-                    onPressed: () {
-                      urlCtrl.text = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80';
-                    },
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Agregar Foto a la Galería',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? Colors.white : const Color(0xFF1B1C1C),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sube una imagen al bucket de Supabase Storage para este negocio.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.photo_library_rounded, color: Color(0xFF3B82F6), size: 24),
+                  ),
+                  title: Text(
+                    'Seleccionar de la galería',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1B1C1C),
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Elige una imagen de tu dispositivo',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _pickAndUploadPhoto(ImageSource.gallery);
+                  },
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF22C55E), size: 24),
+                  ),
+                  title: Text(
+                    'Tomar foto con la cámara',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1B1C1C),
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Captura una foto ahora mismo',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _pickAndUploadPhoto(ImageSource.camera);
+                  },
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () async {
-                if (urlCtrl.text.trim().isEmpty) return;
-
-                Navigator.of(ctx).pop();
-                setState(() => _isLoading = true);
-
-                try {
-                  await BusinessService.instance.addBusinessPhoto(widget.businessId, urlCtrl.text.trim());
-                  await _reloadPhotos();
-                  widget.onUpdated();
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                  }
-                } finally {
-                  if (mounted) setState(() => _isLoading = false);
-                }
-              },
-              child: const Text('Subir Foto'),
-            ),
-          ],
         );
       },
     );
@@ -163,7 +220,7 @@ class _ManagePhotosBottomSheetState extends State<ManagePhotosBottomSheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar foto'),
-        content: const Text('¿Deseas eliminar esta foto de la galería?'),
+        content: const Text('¿Deseas eliminar esta foto de la galería y de Supabase Storage?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
           ElevatedButton(
@@ -178,7 +235,7 @@ class _ManagePhotosBottomSheetState extends State<ManagePhotosBottomSheet> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        await BusinessService.instance.deleteBusinessPhoto(photo.id);
+        await BusinessService.instance.deleteBusinessPhoto(photo.id, photo.imageUrl);
         await _reloadPhotos();
         widget.onUpdated();
       } catch (e) {

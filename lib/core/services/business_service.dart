@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import 'auth_service.dart';
+import 'storage_service.dart';
 import '../../features/business/domain/models/business_registration_model.dart';
 import '../../features/home/domain/models/business_filter_criteria.dart';
 import '../../features/home/presentation/widgets/business_card_item.dart';
@@ -75,6 +76,7 @@ class BusinessService {
 
       // 1. Insertar negocio principal
       final businessInsert = <String, dynamic>{
+        'id': data.id,
         'owner_id': userId,
         'name': data.name.trim().isNotEmpty ? data.name.trim() : 'Mi Negocio',
         'description': data.description.trim(),
@@ -305,10 +307,13 @@ class BusinessService {
     }
   }
 
-  /// Elimina una foto de la galería del negocio
-  Future<void> deleteBusinessPhoto(String photoId) async {
+  /// Elimina una foto de la galería del negocio y de Supabase Storage
+  Future<void> deleteBusinessPhoto(String photoId, [String? photoUrl]) async {
     try {
       await _client.from('business_photos').delete().eq('id', photoId);
+      if (photoUrl != null && photoUrl.isNotEmpty) {
+        await StorageService.instance.deleteBusinessPhotoByUrl(photoUrl);
+      }
       notifyBusinessUpdated();
     } catch (e) {
       debugPrint('Error al eliminar foto: $e');
