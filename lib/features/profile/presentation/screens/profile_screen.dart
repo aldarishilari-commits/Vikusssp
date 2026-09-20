@@ -10,6 +10,7 @@ import '../../../business/presentation/screens/business_profile_screen.dart';
 import '../../../business/presentation/screens/registration/business_registration_flow_screen.dart';
 import '../../../home/presentation/widgets/business_card_item.dart';
 import 'edit_profile_screen.dart';
+import 'management/add_product_bottom_sheet.dart';
 import 'management/edit_business_info_bottom_sheet.dart';
 import 'management/manage_offers_bottom_sheet.dart';
 import 'management/manage_photos_bottom_sheet.dart';
@@ -1396,12 +1397,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 AppNotification.showInfo(context, 'Primero registra un negocio');
                 return;
               }
-              ManageProductsBottomSheet.show(
+              AddProductBottomSheet.show(
                 context,
                 businessId: businessId,
-                businessName: businessName,
-                initialProducts: _myBusinessDetails?.products ?? [],
-                onUpdated: _loadBusinessDetails,
+                onSaved: _loadBusinessDetails,
               );
             },
           ),
