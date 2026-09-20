@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:aeronpulse/core/theme/app_colors.dart';
+import 'package:aeronpulse/core/widgets/app_notification.dart';
+import 'package:aeronpulse/core/services/storage_service.dart';
 import 'package:aeronpulse/features/business/domain/models/business_registration_model.dart';
 import 'package:aeronpulse/features/business/presentation/screens/registration/widgets/registration_shared_widgets.dart';
 
@@ -23,17 +27,225 @@ class Step8PhotoScreen extends StatefulWidget {
 }
 
 class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
-  void _addMockPhoto() {
-    setState(() {
-      widget.data.photoUrls.add(
-          'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=500&q=80');
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Foto agregada correctamente'),
-        duration: Duration(seconds: 1),
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
+  String _uploadStatus = 'Subiendo foto...';
+
+  void _showImageSourceModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE5E0EA),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Agregar fotos del negocio',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF1B1C1C),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Selecciona fotos de la fachada, interior o menú para mostrar tu local.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryAlt.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.photo_library_rounded,
+                      color: AppColors.primaryAlt,
+                      size: 24,
+                    ),
+                  ),
+                  title: Text(
+                    'Seleccionar de la galería',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1B1C1C),
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Elige una o varias fotos guardadas',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _pickMultipleFromGallery();
+                  },
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      color: Color(0xFF22C55E),
+                      size: 24,
+                    ),
+                  ),
+                  title: Text(
+                    'Tomar foto con la cámara',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1B1C1C),
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Captura una foto ahora mismo',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _pickFromCamera();
+                  },
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  Future<void> _pickFromCamera() async {
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+
+      if (picked == null) return;
+
+      setState(() {
+        _isUploading = true;
+        _uploadStatus = 'Subiendo foto a Supabase...';
+      });
+
+      final url = await StorageService.instance.uploadBusinessPhoto(file: picked);
+
+      if (mounted) {
+        setState(() {
+          widget.data.photoUrls.add(url);
+          _isUploading = false;
+        });
+        AppNotification.showSuccess(context, 'Foto subida correctamente');
+      }
+    } catch (e) {
+      debugPrint('Error al capturar foto con cámara: $e');
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+        AppNotification.showError(
+          context,
+          'No se pudo subir la foto. ${e.toString().replaceAll('Exception: ', '')}',
+        );
+      }
+    }
+  }
+
+  Future<void> _pickMultipleFromGallery() async {
+    try {
+      final List<XFile> pickedFiles = await _picker.pickMultiImage(
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+
+      if (pickedFiles.isEmpty) return;
+
+      setState(() {
+        _isUploading = true;
+        _uploadStatus = 'Subiendo 1 de ${pickedFiles.length}...';
+      });
+
+      final uploadedUrls = await StorageService.instance.uploadMultipleBusinessPhotos(
+        files: pickedFiles,
+        onProgress: (current, total) {
+          if (mounted) {
+            setState(() {
+              _uploadStatus = 'Subiendo $current de $total...';
+            });
+          }
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          widget.data.photoUrls.addAll(uploadedUrls);
+          _isUploading = false;
+        });
+        AppNotification.showSuccess(
+          context,
+          '${uploadedUrls.length} ${uploadedUrls.length == 1 ? "foto agregada" : "fotos agregadas"}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error al seleccionar fotos de galería: $e');
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+        AppNotification.showError(
+          context,
+          'Error al subir fotos. ${e.toString().replaceAll('Exception: ', '')}',
+        );
+      }
+    }
+  }
+
+  void _removePhoto(int index) {
+    if (index >= 0 && index < widget.data.photoUrls.length) {
+      setState(() {
+        widget.data.photoUrls.removeAt(index);
+      });
+      AppNotification.showInfo(context, 'Foto eliminada');
+    }
   }
 
   @override
@@ -64,11 +276,11 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
             ),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-          // Photo Upload Box
+          // Main Photo Upload Box / Cover Preview
           GestureDetector(
-            onTap: _addMockPhoto,
+            onTap: _isUploading ? null : _showImageSourceModal,
             child: Container(
               height: 220,
               width: double.infinity,
@@ -87,98 +299,305 @@ class _Step8PhotoScreenState extends State<Step8PhotoScreen> {
                   ),
                 ],
               ),
-              child: hasPhotos
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.network(
-                            widget.data.photoUrls.first,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => const Center(
-                              child: Icon(
-                                Icons.camera_alt_outlined,
-                                size: 48,
-                                color: Color(0xFF1B1C1C),
-                              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (hasPhotos) ...[
+                    // Primary cover photo
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.network(
+                        widget.data.photoUrls.first,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.primaryAlt,
+                              strokeWidth: 2.5,
                             ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) => const Center(
+                          child: Icon(
+                            Icons.broken_image_rounded,
+                            size: 48,
+                            color: Color(0xFF9CA3AF),
                           ),
                         ),
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                widget.data.photoUrls.clear();
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
+                      ),
+                    ),
+                    // Badge "Foto de portada"
+                    Positioned(
+                      bottom: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              color: Color(0xFFFEB700),
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Portada principal',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                                 color: Colors.white,
-                                size: 18,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Delete button for cover photo
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: GestureDetector(
+                        onTap: () => _removePhoto(0),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 18,
                           ),
                         ),
-                      ],
-                    )
-                  : Center(
-                      child: Stack(
-                        alignment: Alignment.center,
+                      ),
+                    ),
+                  ] else ...[
+                    // Placeholder when no photos yet (Exact original visual layout)
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 70,
-                            height: 54,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFF1B1C1C),
-                                width: 2.5,
-                              ),
-                            ),
-                            child: Center(
-                              child: Container(
-                                width: 22,
-                                height: 22,
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 70,
+                                height: 54,
                                 decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: const Color(0xFF1B1C1C),
                                     width: 2.5,
                                   ),
                                 ),
+                                child: Center(
+                                  child: Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFF1B1C1C),
+                                        width: 2.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.add,
+                                    size: 18,
+                                    color: Color(0xFF1B1C1C),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Toca para agregar fotos',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1B1C1C),
                             ),
                           ),
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.add,
-                                size: 18,
-                                color: Color(0xFF1B1C1C),
-                              ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Galería o Cámara',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF6B7280),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+
+                  // Loading overlay during upload
+                  if (_isUploading)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 3,
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              _uploadStatus,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
+
+          // Additional Photos Horizontal List (if photos exist)
+          if (hasPhotos) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Fotos agregadas (${widget.data.photoUrls.length})',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1B1C1C),
+                  ),
+                ),
+                if (!_isUploading)
+                  GestureDetector(
+                    onTap: _showImageSourceModal,
+                    child: Text(
+                      '+ Agregar más',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryAlt,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: widget.data.photoUrls.length + 1,
+                separatorBuilder: (context, index) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  // Last item is "+ Agregar" button
+                  if (index == widget.data.photoUrls.length) {
+                    return GestureDetector(
+                      onTap: _isUploading ? null : _showImageSourceModal,
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFE5E0EA),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.add_photo_alternate_outlined,
+                            color: AppColors.primaryAlt,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final photoUrl = widget.data.photoUrls[index];
+                  final isCover = index == 0;
+
+                  return Stack(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isCover ? AppColors.primaryAlt : const Color(0xFFE5E0EA),
+                            width: isCover ? 2 : 1,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            photoUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (ctx, err, stack) => const Center(
+                              child: Icon(Icons.broken_image, size: 20, color: Color(0xFF9CA3AF)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Small delete badge
+                      Positioned(
+                        top: 3,
+                        right: 3,
+                        child: GestureDetector(
+                          onTap: () => _removePhoto(index),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
 
           const Spacer(),
 

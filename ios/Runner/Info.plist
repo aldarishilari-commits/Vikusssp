@@ -63,5 +63,11 @@
 	<string>Vikus necesita acceso a tu ubicación para mostrarte los negocios, promociones y servicios más cercanos a ti.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Vikus necesita tu ubicación para calcular la distancia en tiempo real hacia los comercios.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vikus necesita acceso a tu galería de fotos para que puedas seleccionar y subir imágenes de tu negocio.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Vikus necesita acceso a tu cámara para que puedas tomar fotos directamente para tu negocio.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Vikus necesita permiso para guardar imágenes en tu galería de fotos.</string>
 </dict>
 </plist>
