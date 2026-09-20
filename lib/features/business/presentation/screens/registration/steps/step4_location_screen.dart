@@ -29,22 +29,77 @@ class Step4LocationScreen extends StatefulWidget {
 
 class _Step4LocationScreenState extends State<Step4LocationScreen> {
   late final TextEditingController _searchController;
-  final GlobalKey<RegistrationMapViewState> _mapKey = GlobalKey<RegistrationMapViewState>();
+  final GlobalKey<RegistrationMapViewState> _mapKey =
+      GlobalKey<RegistrationMapViewState>();
   final GooglePlacesService _placesService = GooglePlacesService();
 
-  List<PlacePrediction> _predictions = [];
-  bool _isSearching = false;
   bool _isLoadingLocation = false;
+  bool _isSearching = false;
+  List<PlacePrediction> _predictions = [];
   Timer? _debounceTimer;
+
+  static const Map<String, LatLng> _knownCityCoordinates = {
+    'la paz': LatLng(-16.5000, -68.1250),
+    'lapaz': LatLng(-16.5000, -68.1250),
+    'sopocachi': LatLng(-16.5135, -68.1275),
+    'calacoto': LatLng(-16.5401, -68.0838),
+    'miraflores': LatLng(-16.4988, -68.1205),
+    'san miguel': LatLng(-16.5420, -68.0790),
+    'achumani': LatLng(-16.5330, -68.0610),
+    'obrajes': LatLng(-16.5270, -68.1060),
+    'el alto': LatLng(-16.5047, -68.1633),
+    'elalto': LatLng(-16.5047, -68.1633),
+    'cobija': LatLng(-11.0267, -68.7692),
+    'pando': LatLng(-11.0267, -68.7692),
+    'santa cruz': LatLng(-17.7833, -63.1821),
+    'santacruz': LatLng(-17.7833, -63.1821),
+    'santa cruz de la sierra': LatLng(-17.7833, -63.1821),
+    'cochabamba': LatLng(-17.3895, -66.1568),
+    'sucre': LatLng(-19.0333, -65.2627),
+    'tarija': LatLng(-21.5355, -64.7296),
+    'oruro': LatLng(-17.9647, -67.1062),
+    'potosi': LatLng(-19.5836, -65.7531),
+    'potosí': LatLng(-19.5836, -65.7531),
+    'beni': LatLng(-14.8333, -64.9000),
+    'trinidad': LatLng(-14.8333, -64.9000),
+  };
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController(
-      text: widget.data.address.isNotEmpty && widget.data.address != 'Av. Pando, La Paz'
+      text: widget.data.address.isNotEmpty &&
+              widget.data.address != 'Av. Pando, La Paz'
           ? widget.data.address
           : '',
     );
+    _initLocation();
+  }
+
+  Future<void> _initLocation() async {
+    // Si ya hay ubicación confirmada personalizada, no la sobreescribimos
+    if (widget.data.isLocationConfirmed &&
+        widget.data.address.isNotEmpty &&
+        widget.data.address != 'Av. Pando, La Paz') {
+      return;
+    }
+
+    try {
+      final pos = await LocationService.getCurrentPosition();
+      if (pos != null && mounted) {
+        final address =
+            await _placesService.reverseGeocode(pos.latitude, pos.longitude);
+        final finalAddr = address ?? 'Mi ubicación actual';
+        setState(() {
+          widget.data.latitude = pos.latitude;
+          widget.data.longitude = pos.longitude;
+          widget.data.address = finalAddr;
+          _searchController.text = finalAddr;
+        });
+        _mapKey.currentState
+            ?.animateToLocation(LatLng(pos.latitude, pos.longitude));
+      }
+    } catch (_) {}
   }
 
   @override
@@ -56,7 +111,8 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
 
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
-    if (query.trim().isEmpty) {
+    final clean = query.trim().toLowerCase();
+    if (clean.isEmpty) {
       setState(() {
         _predictions = [];
         _isSearching = false;
@@ -64,7 +120,17 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
       return;
     }
 
+    // Si coincide con una ciudad o zona boliviana conocida, centrar de inmediato
+    if (_knownCityCoordinates.containsKey(clean)) {
+      final target = _knownCityCoordinates[clean]!;
+      widget.data.latitude = target.latitude;
+      widget.data.longitude = target.longitude;
+      widget.data.address = query.trim();
+      _mapKey.currentState?.animateToLocation(target);
+    }
+
     _debounceTimer = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
       setState(() {
         _isSearching = true;
       });
@@ -79,6 +145,34 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
     });
   }
 
+  Future<void> _searchLocation(String query) async {
+    final clean = query.trim().toLowerCase();
+    if (clean.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+
+    // 1. Coincidencia directa de ciudad
+    if (_knownCityCoordinates.containsKey(clean)) {
+      final target = _knownCityCoordinates[clean]!;
+      setState(() {
+        widget.data.latitude = target.latitude;
+        widget.data.longitude = target.longitude;
+        widget.data.address = query.trim();
+        _predictions = [];
+      });
+      _mapKey.currentState?.animateToLocation(target);
+      return;
+    }
+
+    // 2. Búsqueda por predicciones de Places
+    setState(() => _isSearching = true);
+    final results = await _placesService.getAutocompletePredictions(query.trim());
+    if (results.isNotEmpty && mounted) {
+      await _selectPrediction(results.first);
+    }
+    if (mounted) setState(() => _isSearching = false);
+  }
+
   Future<void> _selectPrediction(PlacePrediction prediction) async {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -89,7 +183,9 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
     final details = await _placesService.getPlaceDetails(prediction.placeId);
     if (details != null && mounted) {
       setState(() {
-        widget.data.address = details.address.isNotEmpty ? details.address : prediction.description;
+        widget.data.address = details.address.isNotEmpty
+            ? details.address
+            : prediction.description;
         widget.data.latitude = details.latitude;
         widget.data.longitude = details.longitude;
         widget.data.isLocationConfirmed = true;
@@ -117,7 +213,8 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
 
       // Reverse geocode to get real street address
       final address = await _placesService.reverseGeocode(lat, lng);
-      final finalAddress = address ?? 'Ubicación actual (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
+      final finalAddress = address ??
+          'Ubicación actual (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
 
       setState(() {
         widget.data.latitude = lat;
@@ -135,7 +232,8 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo obtener la ubicación GPS. Verifica los permisos de ubicación.'),
+          content: Text(
+              'No se pudo obtener la ubicación GPS. Verifica los permisos de ubicación.'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -147,7 +245,8 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
     widget.data.longitude = position.longitude;
     widget.data.isLocationConfirmed = true;
 
-    final address = await _placesService.reverseGeocode(position.latitude, position.longitude);
+    final address = await _placesService.reverseGeocode(
+        position.latitude, position.longitude);
     if (mounted) {
       setState(() {
         if (address != null && address.isNotEmpty) {
@@ -208,19 +307,23 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
                 ),
                 child: Row(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 14, right: 8),
-                      child: _isSearching
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(
-                              Icons.search_rounded,
-                              size: 20,
-                              color: Color(0xFF6B7280),
-                            ),
+                    GestureDetector(
+                      onTap: () => _searchLocation(_searchController.text),
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 14, right: 8),
+                        child: _isSearching
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(
+                                Icons.search_rounded,
+                                size: 20,
+                                color: Color(0xFF6B7280),
+                              ),
+                      ),
                     ),
                     Expanded(
                       child: TextField(
@@ -236,9 +339,11 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
                             color: const Color(0xFFA09FA1),
                           ),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 12),
                         ),
                         onChanged: _onSearchChanged,
+                        onSubmitted: _searchLocation,
                       ),
                     ),
                     if (_searchController.text.isNotEmpty)
@@ -283,7 +388,8 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
                     shrinkWrap: true,
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     itemCount: _predictions.length,
-                    separatorBuilder: (_, index) => const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    separatorBuilder: (_, index) =>
+                        const Divider(height: 1, color: Color(0xFFF3F4F6)),
                     itemBuilder: (context, index) {
                       final pred = _predictions[index];
                       return ListTile(
@@ -334,7 +440,9 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
                     longitude: widget.data.longitude,
                     showPin: true,
                     isInteractive: true,
-                    locationName: widget.data.address.isNotEmpty ? widget.data.address : null,
+                    locationName: widget.data.address.isNotEmpty
+                        ? widget.data.address
+                        : null,
                     onLocationChanged: _onMapLocationChanged,
                   ),
                   const SizedBox(height: 18),
@@ -369,7 +477,9 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
                             ),
                           const SizedBox(width: 8),
                           Text(
-                            _isLoadingLocation ? 'Obteniendo GPS...' : 'Usar mi ubicación actual',
+                            _isLoadingLocation
+                                ? 'Obteniendo GPS...'
+                                : 'Usar mi ubicacion actual',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

@@ -30,9 +30,36 @@ class Step5LocationConfirmedScreen extends StatefulWidget {
 class _Step5LocationConfirmedScreenState
     extends State<Step5LocationConfirmedScreen> {
   late final TextEditingController _addressController;
-  final GlobalKey<RegistrationMapViewState> _mapKey = GlobalKey<RegistrationMapViewState>();
+  final GlobalKey<RegistrationMapViewState> _mapKey =
+      GlobalKey<RegistrationMapViewState>();
   final GooglePlacesService _placesService = GooglePlacesService();
   bool _isLoadingLocation = false;
+
+  static const Map<String, LatLng> _knownCityCoordinates = {
+    'la paz': LatLng(-16.5000, -68.1250),
+    'lapaz': LatLng(-16.5000, -68.1250),
+    'sopocachi': LatLng(-16.5135, -68.1275),
+    'calacoto': LatLng(-16.5401, -68.0838),
+    'miraflores': LatLng(-16.4988, -68.1205),
+    'san miguel': LatLng(-16.5420, -68.0790),
+    'achumani': LatLng(-16.5330, -68.0610),
+    'obrajes': LatLng(-16.5270, -68.1060),
+    'el alto': LatLng(-16.5047, -68.1633),
+    'elalto': LatLng(-16.5047, -68.1633),
+    'cobija': LatLng(-11.0267, -68.7692),
+    'pando': LatLng(-11.0267, -68.7692),
+    'santa cruz': LatLng(-17.7833, -63.1821),
+    'santacruz': LatLng(-17.7833, -63.1821),
+    'santa cruz de la sierra': LatLng(-17.7833, -63.1821),
+    'cochabamba': LatLng(-17.3895, -66.1568),
+    'sucre': LatLng(-19.0333, -65.2627),
+    'tarija': LatLng(-21.5355, -64.7296),
+    'oruro': LatLng(-17.9647, -67.1062),
+    'potosi': LatLng(-19.5836, -65.7531),
+    'potosí': LatLng(-19.5836, -65.7531),
+    'beni': LatLng(-14.8333, -64.9000),
+    'trinidad': LatLng(-14.8333, -64.9000),
+  };
 
   @override
   void initState() {
@@ -56,7 +83,45 @@ class _Step5LocationConfirmedScreenState
     });
   }
 
+  Future<void> _searchAddress(String query) async {
+    final clean = query.trim().toLowerCase();
+    if (clean.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+
+    if (_knownCityCoordinates.containsKey(clean)) {
+      final target = _knownCityCoordinates[clean]!;
+      setState(() {
+        widget.data.latitude = target.latitude;
+        widget.data.longitude = target.longitude;
+        widget.data.address = query.trim();
+      });
+      _mapKey.currentState?.animateToLocation(target);
+      return;
+    }
+
+    final results = await _placesService.getAutocompletePredictions(query.trim());
+    if (results.isNotEmpty && mounted) {
+      final details = await _placesService.getPlaceDetails(results.first.placeId);
+      if (details != null && mounted) {
+        setState(() {
+          widget.data.address = details.address.isNotEmpty
+              ? details.address
+              : results.first.description;
+          widget.data.latitude = details.latitude;
+          widget.data.longitude = details.longitude;
+          widget.data.isLocationConfirmed = true;
+          _addressController.text = widget.data.address;
+        });
+        _mapKey.currentState?.animateToLocation(
+          LatLng(details.latitude, details.longitude),
+        );
+      }
+    }
+  }
+
   Future<void> _useCurrentLocation() async {
+    FocusScope.of(context).unfocus();
     setState(() {
       _isLoadingLocation = true;
     });
@@ -154,12 +219,15 @@ class _Step5LocationConfirmedScreenState
             ),
             child: Row(
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(left: 14, right: 8),
-                  child: Icon(
-                    Icons.search_rounded,
-                    size: 20,
-                    color: Color(0xFF6B7280),
+                GestureDetector(
+                  onTap: () => _searchAddress(_addressController.text),
+                  child: const Padding(
+                    padding: EdgeInsets.only(left: 14, right: 8),
+                    child: Icon(
+                      Icons.search_rounded,
+                      size: 20,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
                 ),
                 Expanded(
@@ -177,6 +245,7 @@ class _Step5LocationConfirmedScreenState
                     onChanged: (val) {
                       widget.data.address = val;
                     },
+                    onSubmitted: _searchAddress,
                   ),
                 ),
                 GestureDetector(
@@ -242,7 +311,9 @@ class _Step5LocationConfirmedScreenState
                             ),
                           const SizedBox(width: 8),
                           Text(
-                            _isLoadingLocation ? 'Obteniendo GPS...' : 'Usar mi ubicacion actual',
+                            _isLoadingLocation
+                                ? 'Obteniendo GPS...'
+                                : 'Usar mi ubicacion actual',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
