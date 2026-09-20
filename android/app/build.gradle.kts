@@ -13,7 +13,7 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(FileInputStream(localPropertiesFile))
 }
-val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: ""
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: "AIzaSyCK_xKmEUBWP2AxIilPBxXDvr-mjU80MFU"
 
 android {
     namespace = "com.example.aeronpulse"
