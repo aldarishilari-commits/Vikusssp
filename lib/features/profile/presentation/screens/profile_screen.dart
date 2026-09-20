@@ -1123,36 +1123,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                GestureDetector(
-                  onTap: () {
-                    if (biz != null) {
-                      EditBusinessInfoBottomSheet.show(
-                        context,
-                        business: biz,
-                        onUpdated: _loadBusinessDetails,
-                      );
-                    } else {
-                      AppNotification.showInfo(context, 'Registra un negocio primero para editar sus datos');
-                    }
-                  },
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.edit_note_rounded,
-                        size: 15,
-                        color: isDark ? const Color(0xFFC084FC) : AppColors.primary,
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        if (biz != null) {
+                          EditBusinessInfoBottomSheet.show(
+                            context,
+                            business: biz,
+                            onUpdated: _loadBusinessDetails,
+                          );
+                        } else {
+                          AppNotification.showInfo(context, 'Registra un negocio primero para editar sus datos');
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_note_rounded,
+                            size: 15,
+                            color: isDark ? const Color(0xFFC084FC) : AppColors.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Editar info',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? const Color(0xFFC084FC) : AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Editar información',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? const Color(0xFFC084FC) : AppColors.primary,
-                        ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        if (biz != null) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => BusinessProfileScreen(business: biz),
+                            ),
+                          );
+                        } else {
+                          AppNotification.showInfo(context, 'Registra un negocio primero para ver su perfil');
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.visibility_rounded,
+                            size: 14,
+                            color: isDark ? const Color(0xFF34D399) : const Color(0xFF15803D),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Ver perfil',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? const Color(0xFF34D399) : const Color(0xFF15803D),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),

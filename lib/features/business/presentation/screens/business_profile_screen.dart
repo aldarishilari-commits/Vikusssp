@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/services/business_service.dart';
 import '../../../../core/services/favorites_service.dart';
 import '../../../../core/services/map_launcher_service.dart';
 import '../../../../core/services/social_launcher_service.dart';
@@ -10,8 +11,6 @@ import '../../../home/presentation/widgets/business_card_item.dart';
 import '../../../offers/data/models/offer_model.dart';
 import '../../../offers/presentation/widgets/offer_detail_bottom_sheet.dart';
 import '../widgets/business_schedule_bottom_sheet.dart';
-
-
 
 /// Modelo para las tarjetas horizontales de ofertas destacadas
 class BusinessSpecialOfferItem {
@@ -58,17 +57,41 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   late final PageController _coverPageController;
   int _currentCoverIndex = 0;
 
+  List<BusinessItemModel>? _realItems;
+
   @override
   void initState() {
     super.initState();
     _isFavorite = FavoritesService.instance.isBusinessFavorite(widget.business.id) || widget.business.isFavorite;
     _coverPageController = PageController();
+    BusinessService.instance.businessUpdatesNotifier.addListener(_onBusinessUpdated);
+    _loadBusinessItems();
   }
 
   @override
   void dispose() {
+    BusinessService.instance.businessUpdatesNotifier.removeListener(_onBusinessUpdated);
     _coverPageController.dispose();
     super.dispose();
+  }
+
+  void _onBusinessUpdated() {
+    if (mounted) {
+      _loadBusinessItems();
+    }
+  }
+
+  Future<void> _loadBusinessItems() async {
+    try {
+      final items = await BusinessService.instance.getBusinessItems(widget.business.id);
+      if (mounted) {
+        setState(() {
+          _realItems = items;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error al cargar items del negocio: $e');
+    }
   }
 
   void _toggleBusinessFavorite() {
@@ -176,6 +199,30 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
 
   /// Lista de servicios ofrecidos adaptada según la categoría y perfil del negocio
   List<BusinessServiceItem> _getBusinessServices() {
+    if (_realItems != null && _realItems!.any((it) => it.itemType == 'service')) {
+      return _realItems!
+          .where((it) => it.itemType == 'service')
+          .map((it) {
+            final priceStr = 'Bs. ${it.price.truncateToDouble() == it.price ? it.price.toInt() : it.price.toStringAsFixed(2)}';
+            final img = it.imageUrl.isNotEmpty
+                ? it.imageUrl
+                : (widget.business.imageUrl.isNotEmpty
+                    ? widget.business.imageUrl
+                    : 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=500&q=80');
+            return BusinessServiceItem(
+              id: it.id,
+              title: it.name,
+              description: it.description.isNotEmpty
+                  ? it.description
+                  : 'Servicio ofrecido por ${widget.business.name}',
+              price: priceStr,
+              numericPrice: it.price,
+              imageUrl: img,
+              businessName: widget.business.name,
+            );
+          }).toList();
+    }
+
     final b = widget.business;
     final cat = b.category.toLowerCase();
     final name = b.name.toLowerCase();
@@ -353,6 +400,33 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
 
   /// Ofertas destacadas horizontales (como las del diseño del dentista)
   List<BusinessSpecialOfferItem> _getBusinessSpecialOffers() {
+    if (_realItems != null && _realItems!.any((it) => it.isFlashOffer)) {
+      return _realItems!
+          .where((it) => it.isFlashOffer)
+          .map((it) {
+            final origPrice = it.price;
+            final flashP = it.flashPrice ?? it.price;
+            final discountPct = origPrice > 0 && flashP < origPrice
+                ? '-${(((origPrice - flashP) / origPrice) * 100).round()}%'
+                : 'Oferta';
+            final img = it.imageUrl.isNotEmpty
+                ? it.imageUrl
+                : (widget.business.imageUrl.isNotEmpty
+                    ? widget.business.imageUrl
+                    : 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');
+            return BusinessSpecialOfferItem(
+              id: it.id,
+              badge: 'Flash',
+              discountHeadline: discountPct,
+              title: it.name,
+              timerBadge: it.repeatDays.isNotEmpty ? it.repeatDays.join(', ') : 'Solo hoy',
+              imageUrl: img,
+              originalPrice: 'Bs. ${origPrice.truncateToDouble() == origPrice ? origPrice.toInt() : origPrice.toStringAsFixed(2)}',
+              offerPrice: 'Bs. ${flashP.truncateToDouble() == flashP ? flashP.toInt() : flashP.toStringAsFixed(2)}',
+            );
+          }).toList();
+    }
+
     final b = widget.business;
     final cat = b.category.toLowerCase();
     final name = b.name.toLowerCase();
@@ -447,6 +521,30 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   }
 
   List<BusinessProductItem> _getBusinessProducts() {
+    if (_realItems != null && _realItems!.any((it) => it.itemType == 'product' && !it.isFlashOffer)) {
+      return _realItems!
+          .where((it) => it.itemType == 'product' && !it.isFlashOffer)
+          .map((it) {
+            final priceStr = 'Bs. ${it.price.truncateToDouble() == it.price ? it.price.toInt() : it.price.toStringAsFixed(2)}';
+            final img = it.imageUrl.isNotEmpty
+                ? it.imageUrl
+                : (widget.business.imageUrl.isNotEmpty
+                    ? widget.business.imageUrl
+                    : 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');
+            return BusinessProductItem(
+              id: it.id,
+              title: it.name,
+              price: priceStr,
+              originalPrice: '',
+              discount: '',
+              timer: '',
+              stock: 'Stock: ${it.availableQuantity}',
+              imageUrl: img,
+              businessName: widget.business.name,
+            );
+          }).toList();
+    }
+
     final b = widget.business;
 
     if (b.category.toLowerCase().contains('comida') ||
@@ -567,6 +665,37 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
         ),
       ];
     }
+  }
+
+  List<BusinessProductItem> _getBusinessFlashProducts() {
+    if (_realItems != null && _realItems!.any((it) => it.isFlashOffer)) {
+      return _realItems!
+          .where((it) => it.isFlashOffer)
+          .map((it) {
+            final origPrice = it.price;
+            final flashP = it.flashPrice ?? it.price;
+            final discountPct = origPrice > 0 && flashP < origPrice
+                ? '-${(((origPrice - flashP) / origPrice) * 100).round()}%'
+                : 'Oferta';
+            final img = it.imageUrl.isNotEmpty
+                ? it.imageUrl
+                : (widget.business.imageUrl.isNotEmpty
+                    ? widget.business.imageUrl
+                    : 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');
+            return BusinessProductItem(
+              id: it.id,
+              title: it.name,
+              price: 'Bs. ${flashP.truncateToDouble() == flashP ? flashP.toInt() : flashP.toStringAsFixed(2)}',
+              originalPrice: 'Bs. ${origPrice.truncateToDouble() == origPrice ? origPrice.toInt() : origPrice.toStringAsFixed(2)}',
+              discount: discountPct,
+              timer: 'Hoy',
+              stock: 'Quedan ${it.availableQuantity}',
+              imageUrl: img,
+              businessName: widget.business.name,
+            );
+          }).toList();
+    }
+    return _getBusinessProducts();
   }
 
   void _openReviewModal() {
@@ -690,7 +819,9 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final b = widget.business;
-    final products = _getBusinessProducts();
+    final products = _selectedCatalogTab == 0
+        ? _getBusinessFlashProducts()
+        : _getBusinessProducts();
     final services = _getBusinessServices();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

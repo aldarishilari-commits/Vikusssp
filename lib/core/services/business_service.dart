@@ -142,14 +142,20 @@ class BusinessService {
       // 4. Insertar productos
       if (data.products.isNotEmpty) {
         final productsPayload = data.products.map((p) {
+          final imgUrl = (p.imagePath != null && p.imagePath!.isNotEmpty)
+              ? p.imagePath!
+              : (data.photoUrls.isNotEmpty
+                  ? data.photoUrls.first
+                  : 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');
+
           return {
             'business_id': newBusinessId,
             'item_type': 'product',
             'name': p.name,
             'description': p.description ?? '',
             'price': p.normalPrice ?? 0.0,
-            'image_url': p.imagePath,
-            'available_quantity': p.availableQuantity,
+            'image_url': imgUrl,
+            'available_quantity': p.availableQuantity ?? 10,
             'is_flash_offer': p.isFlashOffer,
             'flash_price': p.flashPrice,
             'repeat_days': p.repeatDays,
@@ -163,14 +169,20 @@ class BusinessService {
       // 5. Insertar servicios
       if (data.services.isNotEmpty) {
         final servicesPayload = data.services.map((s) {
+          final imgUrl = (s.imagePath != null && s.imagePath!.isNotEmpty)
+              ? s.imagePath!
+              : (data.photoUrls.isNotEmpty
+                  ? data.photoUrls.first
+                  : 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=500&q=80');
+
           return {
             'business_id': newBusinessId,
             'item_type': 'service',
             'name': s.name,
             'description': s.description ?? '',
             'price': s.normalPrice ?? 0.0,
-            'image_url': s.imagePath,
-            'available_quantity': s.availableQuantity,
+            'image_url': imgUrl,
+            'available_quantity': s.availableQuantity ?? 10,
             'is_flash_offer': s.isFlashOffer,
             'flash_price': s.flashPrice,
             'repeat_days': s.repeatDays,
