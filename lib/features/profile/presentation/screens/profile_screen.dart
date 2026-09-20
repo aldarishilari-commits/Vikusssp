@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/business_service.dart';
 import '../../../../core/services/profile_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_notification.dart';
@@ -9,6 +10,13 @@ import '../../../business/presentation/screens/business_profile_screen.dart';
 import '../../../business/presentation/screens/registration/business_registration_flow_screen.dart';
 import '../../../home/presentation/widgets/business_card_item.dart';
 import 'edit_profile_screen.dart';
+import 'management/edit_business_info_bottom_sheet.dart';
+import 'management/manage_offers_bottom_sheet.dart';
+import 'management/manage_photos_bottom_sheet.dart';
+import 'management/manage_products_bottom_sheet.dart';
+import 'management/manage_schedule_bottom_sheet.dart';
+import 'management/manage_services_bottom_sheet.dart';
+import 'management/manage_social_links_bottom_sheet.dart';
 import 'pro/vikus_pro_subscription_screen.dart';
 import 'settings_screen.dart';
 
@@ -33,6 +41,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _activeProfileTab = 0;
 
   UserProfileModel? _profile;
+  BusinessFullDetails? _myBusinessDetails;
+  bool _isLoadingBusiness = false;
 
   String _userName = 'Aldaris Guzmán';
   String _userPhone = '78946546';
@@ -42,6 +52,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadBusinessDetails();
+    BusinessService.instance.businessUpdatesNotifier.addListener(_onBusinessUpdated);
+  }
+
+  @override
+  void dispose() {
+    BusinessService.instance.businessUpdatesNotifier.removeListener(_onBusinessUpdated);
+    super.dispose();
+  }
+
+  void _onBusinessUpdated() {
+    if (mounted) {
+      _loadBusinessDetails();
+    }
+  }
+
+  Future<void> _loadBusinessDetails() async {
+    if (!mounted) return;
+    setState(() => _isLoadingBusiness = true);
+    try {
+      final details = await BusinessService.instance.getMyBusiness();
+      if (mounted) {
+        setState(() {
+          _myBusinessDetails = details;
+          _isLoadingBusiness = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingBusiness = false);
+      }
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -889,6 +931,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildBusinessAdminTabContent() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    if (_isLoadingBusiness && _myBusinessDetails == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Column(
+            children: [
+              const CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 12),
+              Text(
+                'Cargando datos de tu negocio...',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: isDark ? Colors.white70 : const Color(0xFF6B7280),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -950,6 +1013,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildBusinessHeaderCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final biz = _myBusinessDetails?.business;
+    final name = biz?.name ?? "Elis' Pizza";
+    final address = biz?.address.isNotEmpty == true ? biz!.address : 'Av. Montes, ${widget.selectedCity}';
+    final imageUrl = biz?.imageUrl ??
+        'https://lh3.googleusercontent.com/aida-public/AB6AXuDWx20X9KGhQhhzDwvHmMeqyrqxRuDNPNO-3MhtvG8QErbTZJx_FLjulmAiD6orhyw34AfrjRP44VRBjr_Rjw5b4KiW5VklGmYsI7_jQ-YGceqhTdyCxBuT_nXHDale8_oQaNVpkPa7DslIo_rnrDDoATJj7NmHTpkscuB9Y4YJNFLcnL5JCX4irHz8PCH77Uiiz4v4zNyB-kXzF3jyqC53wHvN4a57GzZdr24nv4IreQMhCEbYgHkPWg';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -972,7 +1040,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
             child: Image.network(
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDWx20X9KGhQhhzDwvHmMeqyrqxRuDNPNO-3MhtvG8QErbTZJx_FLjulmAiD6orhyw34AfrjRP44VRBjr_Rjw5b4KiW5VklGmYsI7_jQ-YGceqhTdyCxBuT_nXHDale8_oQaNVpkPa7DslIo_rnrDDoATJj7NmHTpkscuB9Y4YJNFLcnL5JCX4irHz8PCH77Uiiz4v4zNyB-kXzF3jyqC53wHvN4a57GzZdr24nv4IreQMhCEbYgHkPWg',
+              imageUrl,
               width: 64,
               height: 64,
               fit: BoxFit.cover,
@@ -981,7 +1049,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 64,
                 color: isDark ? const Color(0xFF271B3B) : const Color(0xFFF3E8FF),
                 child: const Center(
-                  child: Icon(Icons.local_pizza_rounded, color: AppColors.primary, size: 28),
+                  child: Icon(Icons.storefront_rounded, color: AppColors.primary, size: 28),
                 ),
               ),
             ),
@@ -995,7 +1063,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        "Elis' Pizza",
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -1039,11 +1109,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     const Icon(Icons.location_on_rounded, size: 12, color: Color(0xFFEF4444)),
                     const SizedBox(width: 3),
-                    Text(
-                      'Av. Montes, ${widget.selectedCity}',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                    Expanded(
+                      child: Text(
+                        address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                        ),
                       ),
                     ),
                   ],
@@ -1051,9 +1125,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 6),
                 GestureDetector(
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('✏️ Editando información de negocio')),
-                    );
+                    if (biz != null) {
+                      EditBusinessInfoBottomSheet.show(
+                        context,
+                        business: biz,
+                        onUpdated: _loadBusinessDetails,
+                      );
+                    } else {
+                      AppNotification.showInfo(context, 'Registra un negocio primero para editar sus datos');
+                    }
                   },
                   child: Row(
                     children: [
@@ -1167,6 +1247,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPerformanceMetricsRow() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final offersCount = _myBusinessDetails?.flashOffers.length ?? 0;
+    final rating = _myBusinessDetails?.business.rating.toStringAsFixed(1) ?? '4.5';
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -1199,13 +1281,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             height: 28,
             color: isDark ? const Color(0xFF2E2B36) : const Color(0xFFF3F4F6),
           ),
-          _buildMetricItem(icon: Icons.local_fire_department_rounded, value: '4', label: 'Ofertas act.', color: const Color(0xFFF97316)),
+          _buildMetricItem(icon: Icons.local_fire_department_rounded, value: '$offersCount', label: 'Ofertas act.', color: const Color(0xFFF97316)),
           Container(
             width: 1,
             height: 28,
             color: isDark ? const Color(0xFF2E2B36) : const Color(0xFFF3F4F6),
           ),
-          _buildMetricItem(icon: Icons.star_rounded, value: '4.5', label: 'Calificación', color: const Color(0xFFEAB308)),
+          _buildMetricItem(icon: Icons.star_rounded, value: rating, label: 'Calificación', color: const Color(0xFFEAB308)),
         ],
       ),
     );
@@ -1243,6 +1325,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildQuickActionsRow() {
+    final biz = _myBusinessDetails?.business;
+    final businessId = biz?.id ?? '';
+    final businessName = biz?.name ?? 'Mi Negocio';
+
     return Row(
       children: [
         Expanded(
@@ -1250,10 +1336,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.local_offer_rounded,
             label: 'Crear oferta\nespecial',
             onTap: () {
-              AppNotification.showSuccess(
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageOffersBottomSheet.show(
                 context,
-                'Oferta especial creada con éxito',
-                icon: Icons.local_offer_rounded,
+                businessId: businessId,
+                businessName: businessName,
+                initialOffers: _myBusinessDetails?.flashOffers ?? [],
+                onUpdated: _loadBusinessDetails,
               );
             },
           ),
@@ -1264,10 +1356,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.inventory_2_rounded,
             label: 'Agregar\nproducto',
             onTap: () {
-              AppNotification.showSuccess(
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageProductsBottomSheet.show(
                 context,
-                'Producto agregado con éxito',
-                icon: Icons.inventory_2_rounded,
+                businessId: businessId,
+                businessName: businessName,
+                initialProducts: _myBusinessDetails?.products ?? [],
+                onUpdated: _loadBusinessDetails,
               );
             },
           ),
@@ -1278,10 +1376,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.room_service_rounded,
             label: 'Agregar\nservicio',
             onTap: () {
-              AppNotification.showSuccess(
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageServicesBottomSheet.show(
                 context,
-                'Servicio agregado con éxito',
-                icon: Icons.room_service_rounded,
+                businessId: businessId,
+                businessName: businessName,
+                initialServices: _myBusinessDetails?.services ?? [],
+                onUpdated: _loadBusinessDetails,
               );
             },
           ),
@@ -1351,6 +1455,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildAdminModulesList() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final biz = _myBusinessDetails?.business;
+    final businessId = biz?.id ?? '';
+    final businessName = biz?.name ?? 'Mi Negocio';
+
+    final offersCount = _myBusinessDetails?.flashOffers.length ?? 0;
+    final productsCount = _myBusinessDetails?.products.length ?? 0;
+    final servicesCount = _myBusinessDetails?.services.length ?? 0;
+    final photosCount = _myBusinessDetails?.photos.length ?? (biz?.photoUrls.length ?? 0);
+
+    final scheduleSummary = _formatScheduleSummary(biz?.schedules);
 
     return Container(
       decoration: BoxDecoration(
@@ -1373,8 +1487,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.local_fire_department_rounded,
             iconColor: const Color(0xFFF97316),
             title: 'Ofertas activas',
-            counterBadge: '2',
-            onTap: () {},
+            counterBadge: '$offersCount',
+            onTap: () {
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageOffersBottomSheet.show(
+                context,
+                businessId: businessId,
+                businessName: businessName,
+                initialOffers: _myBusinessDetails?.flashOffers ?? [],
+                onUpdated: _loadBusinessDetails,
+              );
+            },
           ),
           Divider(
             height: 1,
@@ -1384,8 +1510,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.inventory_2_rounded,
             iconColor: const Color(0xFFD97706),
             title: 'Productos',
-            counterBadge: '2',
-            onTap: () {},
+            counterBadge: '$productsCount',
+            onTap: () {
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageProductsBottomSheet.show(
+                context,
+                businessId: businessId,
+                businessName: businessName,
+                initialProducts: _myBusinessDetails?.products ?? [],
+                onUpdated: _loadBusinessDetails,
+              );
+            },
           ),
           Divider(
             height: 1,
@@ -1395,8 +1533,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.room_service_rounded,
             iconColor: const Color(0xFFEAB308),
             title: 'Servicios',
-            counterBadge: '2',
-            onTap: () {},
+            counterBadge: '$servicesCount',
+            onTap: () {
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageServicesBottomSheet.show(
+                context,
+                businessId: businessId,
+                businessName: businessName,
+                initialServices: _myBusinessDetails?.services ?? [],
+                onUpdated: _loadBusinessDetails,
+              );
+            },
           ),
           Divider(
             height: 1,
@@ -1406,8 +1556,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.photo_library_rounded,
             iconColor: const Color(0xFF3B82F6),
             title: 'Fotos del negocio',
-            counterBadge: '2',
-            onTap: () {},
+            counterBadge: '$photosCount',
+            onTap: () {
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManagePhotosBottomSheet.show(
+                context,
+                businessId: businessId,
+                businessName: businessName,
+                initialPhotos: _myBusinessDetails?.photos ?? [],
+                onUpdated: _loadBusinessDetails,
+              );
+            },
           ),
           Divider(
             height: 1,
@@ -1417,8 +1579,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.access_time_filled_rounded,
             iconColor: const Color(0xFF22C55E),
             title: 'Horario',
-            infoText: 'Lun - Dom: 09:00 - 22:00',
-            onTap: () {},
+            infoText: scheduleSummary,
+            onTap: () {
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageScheduleBottomSheet.show(
+                context,
+                businessId: businessId,
+                businessName: businessName,
+                initialSchedules: biz?.schedules,
+                onUpdated: _loadBusinessDetails,
+              );
+            },
           ),
           Divider(
             height: 1,
@@ -1428,11 +1602,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.language_rounded,
             iconColor: const Color(0xFF6366F1),
             title: 'Redes sociales y página web',
-            onTap: () {},
+            onTap: () {
+              if (businessId.isEmpty) {
+                AppNotification.showInfo(context, 'Primero registra un negocio');
+                return;
+              }
+              ManageSocialLinksBottomSheet.show(
+                context,
+                businessId: businessId,
+                businessName: businessName,
+                initialPhone: biz?.phoneNumber,
+                initialWhatsapp: biz?.phoneNumber,
+                initialFacebook: biz?.facebook,
+                initialInstagram: biz?.instagram,
+                initialTiktok: biz?.tiktok,
+                initialWebsite: biz?.website,
+                onUpdated: _loadBusinessDetails,
+              );
+            },
           ),
         ],
       ),
     );
+  }
+
+  String _formatScheduleSummary(Map<String, dynamic>? schedules) {
+    if (schedules == null || schedules.isEmpty) {
+      return 'Lun - Dom: 08:00 - 20:00';
+    }
+    return 'Lun - Dom configurado';
   }
 
   Widget _buildAdminRow({

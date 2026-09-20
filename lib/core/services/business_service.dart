@@ -188,6 +188,239 @@ class BusinessService {
     }
   }
 
+  /// Obtiene el negocio principal administrado por el usuario actual (o el más reciente registrado)
+  Future<BusinessFullDetails?> getMyBusiness() async {
+    try {
+      final userId = AuthService().currentUserId;
+      var query = _client
+          .from('businesses')
+          .select('*, business_schedules(*), business_photos(*), business_items(*)');
+
+      if (userId != null) {
+        query = query.eq('owner_id', userId);
+      }
+
+      final response = await query.order('created_at', ascending: false).limit(1);
+      final list = response as List<dynamic>;
+      if (list.isEmpty) {
+        // Si no tiene negocio registrado propio, obtener el primero para modo demo/admin
+        final fallback = await _client
+            .from('businesses')
+            .select('*, business_schedules(*), business_photos(*), business_items(*)')
+            .order('created_at', ascending: false)
+            .limit(1);
+        final fallbackList = fallback as List<dynamic>;
+        if (fallbackList.isEmpty) return null;
+        return _mapToFullDetails(fallbackList.first as Map<String, dynamic>);
+      }
+
+      return _mapToFullDetails(list.first as Map<String, dynamic>);
+    } catch (e) {
+      debugPrint('Error al obtener negocio administrado: $e');
+      return null;
+    }
+  }
+
+  /// Obtiene la lista completa de ítems (productos, servicios y ofertas) de un negocio
+  Future<List<BusinessItemModel>> getBusinessItems(String businessId) async {
+    try {
+      final response = await _client
+          .from('business_items')
+          .select('*')
+          .eq('business_id', businessId)
+          .order('created_at', ascending: false);
+
+      return (response as List<dynamic>)
+          .map((item) => BusinessItemModel.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Error al obtener ítems de negocio: $e');
+      return [];
+    }
+  }
+
+  /// Agrega un nuevo ítem (producto o servicio) al negocio
+  Future<BusinessItemModel> addBusinessItem(BusinessItemModel item) async {
+    try {
+      final payload = item.toJson()..remove('id');
+      final response = await _client
+          .from('business_items')
+          .insert(payload)
+          .select()
+          .single();
+
+      notifyBusinessUpdated();
+      return BusinessItemModel.fromJson(response);
+    } catch (e) {
+      debugPrint('Error al agregar ítem a negocio: $e');
+      throw Exception('No se pudo agregar el ítem: $e');
+    }
+  }
+
+  /// Actualiza un ítem existente
+  Future<void> updateBusinessItem(BusinessItemModel item) async {
+    try {
+      final payload = item.toJson();
+      await _client
+          .from('business_items')
+          .update(payload)
+          .eq('id', item.id);
+
+      notifyBusinessUpdated();
+    } catch (e) {
+      debugPrint('Error al actualizar ítem: $e');
+      throw Exception('No se pudo actualizar el ítem: $e');
+    }
+  }
+
+  /// Elimina un ítem del negocio
+  Future<void> deleteBusinessItem(String itemId) async {
+    try {
+      await _client.from('business_items').delete().eq('id', itemId);
+      notifyBusinessUpdated();
+    } catch (e) {
+      debugPrint('Error al eliminar ítem: $e');
+      throw Exception('No se pudo eliminar el ítem: $e');
+    }
+  }
+
+  /// Agrega una nueva foto a la galería del negocio
+  Future<BusinessPhotoModel> addBusinessPhoto(String businessId, String imageUrl) async {
+    try {
+      final response = await _client
+          .from('business_photos')
+          .insert({
+            'business_id': businessId,
+            'image_url': imageUrl,
+            'sort_order': DateTime.now().millisecondsSinceEpoch % 1000,
+          })
+          .select()
+          .single();
+
+      notifyBusinessUpdated();
+      return BusinessPhotoModel.fromJson(response);
+    } catch (e) {
+      debugPrint('Error al agregar foto de negocio: $e');
+      throw Exception('No se pudo agregar la foto: $e');
+    }
+  }
+
+  /// Elimina una foto de la galería del negocio
+  Future<void> deleteBusinessPhoto(String photoId) async {
+    try {
+      await _client.from('business_photos').delete().eq('id', photoId);
+      notifyBusinessUpdated();
+    } catch (e) {
+      debugPrint('Error al eliminar foto: $e');
+      throw Exception('No se pudo eliminar la foto: $e');
+    }
+  }
+
+  /// Actualiza los horarios semanales del negocio en Supabase
+  Future<void> updateBusinessSchedules(String businessId, Map<String, DaySchedule> schedules) async {
+    try {
+      // Eliminar horarios anteriores
+      await _client.from('business_schedules').delete().eq('business_id', businessId);
+
+      // Insertar nuevos horarios
+      final schedulesPayload = <Map<String, dynamic>>[];
+      schedules.forEach((dayName, schedule) {
+        schedulesPayload.add({
+          'business_id': businessId,
+          'day_name': dayName,
+          'is_open': schedule.isOpen,
+          'open_time': '${schedule.openTime.hour.toString().padLeft(2, '0')}:${schedule.openTime.minute.toString().padLeft(2, '0')}:00',
+          'close_time': '${schedule.closeTime.hour.toString().padLeft(2, '0')}:${schedule.closeTime.minute.toString().padLeft(2, '0')}:00',
+        });
+      });
+
+      if (schedulesPayload.isNotEmpty) {
+        await _client.from('business_schedules').insert(schedulesPayload);
+      }
+
+      notifyBusinessUpdated();
+    } catch (e) {
+      debugPrint('Error al actualizar horarios: $e');
+      throw Exception('No se pudieron actualizar los horarios: $e');
+    }
+  }
+
+  /// Actualiza las redes sociales y página web del negocio
+  Future<void> updateBusinessSocialLinks(
+    String businessId, {
+    String? phone,
+    String? whatsapp,
+    String? facebook,
+    String? instagram,
+    String? tiktok,
+    String? website,
+  }) async {
+    try {
+      final updates = <String, dynamic>{};
+      if (phone != null) updates['phone_number'] = phone.trim();
+      if (whatsapp != null) updates['whatsapp_number'] = whatsapp.trim();
+      if (facebook != null) updates['facebook_url'] = facebook.trim();
+      if (instagram != null) updates['instagram_url'] = instagram.trim();
+      if (tiktok != null) updates['tiktok_url'] = tiktok.trim();
+      if (website != null) updates['website_url'] = website.trim();
+
+      if (updates.isNotEmpty) {
+        await _client.from('businesses').update(updates).eq('id', businessId);
+        notifyBusinessUpdated();
+      }
+    } catch (e) {
+      debugPrint('Error al actualizar redes sociales: $e');
+      throw Exception('No se pudieron guardar las redes sociales: $e');
+    }
+  }
+
+  /// Actualiza la información básica del negocio (Nombre, descripción, dirección, categoría, portada)
+  Future<void> updateBusinessInfo(
+    String businessId, {
+    String? name,
+    String? description,
+    String? address,
+    String? categoryId,
+    String? coverImageUrl,
+  }) async {
+    try {
+      final updates = <String, dynamic>{};
+      if (name != null && name.trim().isNotEmpty) updates['name'] = name.trim();
+      if (description != null) updates['description'] = description.trim();
+      if (address != null && address.trim().isNotEmpty) updates['address'] = address.trim();
+      if (categoryId != null) updates['category_id'] = _mapCategoryToId(categoryId);
+      if (coverImageUrl != null && coverImageUrl.isNotEmpty) updates['cover_image_url'] = coverImageUrl;
+
+      if (updates.isNotEmpty) {
+        await _client.from('businesses').update(updates).eq('id', businessId);
+        notifyBusinessUpdated();
+      }
+    } catch (e) {
+      debugPrint('Error al actualizar información de negocio: $e');
+      throw Exception('No se pudo actualizar la información del negocio: $e');
+    }
+  }
+
+  static BusinessFullDetails _mapToFullDetails(Map<String, dynamic> row) {
+    final business = mapSupabaseToBusinessModel(row);
+    final rawItems = row['business_items'] as List<dynamic>? ?? [];
+    final rawPhotos = row['business_photos'] as List<dynamic>? ?? [];
+
+    final items = rawItems
+        .map((it) => BusinessItemModel.fromJson(it as Map<String, dynamic>))
+        .toList();
+
+    final photos = rawPhotos
+        .map((ph) => BusinessPhotoModel.fromJson(ph as Map<String, dynamic>))
+        .toList();
+
+    return BusinessFullDetails(
+      business: business,
+      items: items,
+      photos: photos,
+    );
+  }
+
   /// Mapea un registro JSON de Supabase a [BusinessModel]
   static BusinessModel mapSupabaseToBusinessModel(Map<String, dynamic> row) {
     final String categoryId = (row['category_id'] as String?)?.toLowerCase() ?? 'otros';
@@ -333,4 +566,149 @@ class BusinessService {
         return 'Comercio';
     }
   }
+}
+
+/// Modelo de ítem de negocio (Producto, Servicio u Oferta)
+class BusinessItemModel {
+  final String id;
+  final String businessId;
+  final String itemType; // 'product' | 'service'
+  final String name;
+  final String description;
+  final double price;
+  final String imageUrl;
+  final int availableQuantity;
+  final bool isFlashOffer;
+  final double? flashPrice;
+  final bool isAvailable;
+  final List<String> repeatDays;
+
+  const BusinessItemModel({
+    required this.id,
+    required this.businessId,
+    required this.itemType,
+    required this.name,
+    this.description = '',
+    required this.price,
+    this.imageUrl = '',
+    this.availableQuantity = 10,
+    this.isFlashOffer = false,
+    this.flashPrice,
+    this.isAvailable = true,
+    this.repeatDays = const [],
+  });
+
+  factory BusinessItemModel.fromJson(Map<String, dynamic> json) {
+    final priceNum = json['price'];
+    final flashNum = json['flash_price'];
+    final daysList = json['repeat_days'] as List<dynamic>? ?? [];
+
+    return BusinessItemModel(
+      id: json['id'] as String? ?? '',
+      businessId: json['business_id'] as String? ?? '',
+      itemType: json['item_type'] as String? ?? 'product',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      price: priceNum is num ? priceNum.toDouble() : 0.0,
+      imageUrl: json['image_url'] as String? ?? '',
+      availableQuantity: json['available_quantity'] as int? ?? 10,
+      isFlashOffer: json['is_flash_offer'] as bool? ?? false,
+      flashPrice: flashNum is num ? flashNum.toDouble() : null,
+      isAvailable: json['is_available'] as bool? ?? true,
+      repeatDays: daysList.map((d) => d.toString()).toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (id.isNotEmpty) 'id': id,
+      'business_id': businessId,
+      'item_type': itemType,
+      'name': name,
+      'description': description,
+      'price': price,
+      'image_url': imageUrl,
+      'available_quantity': availableQuantity,
+      'is_flash_offer': isFlashOffer,
+      'flash_price': flashPrice,
+      'is_available': isAvailable,
+      'repeat_days': repeatDays,
+    };
+  }
+
+  BusinessItemModel copyWith({
+    String? id,
+    String? businessId,
+    String? itemType,
+    String? name,
+    String? description,
+    double? price,
+    String? imageUrl,
+    int? availableQuantity,
+    bool? isFlashOffer,
+    double? flashPrice,
+    bool? isAvailable,
+    List<String>? repeatDays,
+  }) {
+    return BusinessItemModel(
+      id: id ?? this.id,
+      businessId: businessId ?? this.businessId,
+      itemType: itemType ?? this.itemType,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      imageUrl: imageUrl ?? this.imageUrl,
+      availableQuantity: availableQuantity ?? this.availableQuantity,
+      isFlashOffer: isFlashOffer ?? this.isFlashOffer,
+      flashPrice: flashPrice ?? this.flashPrice,
+      isAvailable: isAvailable ?? this.isAvailable,
+      repeatDays: repeatDays ?? this.repeatDays,
+    );
+  }
+}
+
+/// Modelo de foto de la galería del negocio
+class BusinessPhotoModel {
+  final String id;
+  final String businessId;
+  final String imageUrl;
+  final int sortOrder;
+
+  const BusinessPhotoModel({
+    required this.id,
+    required this.businessId,
+    required this.imageUrl,
+    this.sortOrder = 0,
+  });
+
+  factory BusinessPhotoModel.fromJson(Map<String, dynamic> json) {
+    return BusinessPhotoModel(
+      id: json['id'] as String? ?? '',
+      businessId: json['business_id'] as String? ?? '',
+      imageUrl: json['image_url'] as String? ?? '',
+      sortOrder: json['sort_order'] as int? ?? 0,
+    );
+  }
+}
+
+/// Contenedor completo del negocio y sus colecciones
+class BusinessFullDetails {
+  final BusinessModel business;
+  final List<BusinessItemModel> items;
+  final List<BusinessPhotoModel> photos;
+
+  const BusinessFullDetails({
+    required this.business,
+    required this.items,
+    required this.photos,
+  });
+
+  List<BusinessItemModel> get products =>
+      items.where((it) => it.itemType == 'product' && !it.isFlashOffer).toList();
+
+  List<BusinessItemModel> get services =>
+      items.where((it) => it.itemType == 'service' && !it.isFlashOffer).toList();
+
+  List<BusinessItemModel> get flashOffers =>
+      items.where((it) => it.isFlashOffer && it.isAvailable).toList();
 }
