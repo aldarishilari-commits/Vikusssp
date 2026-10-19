@@ -487,7 +487,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
                           Text(
                             _isLoadingLocation
                                 ? 'Obteniendo GPS...'
-                                : 'Usar mi ubicacion actual',
+                                : 'Usar mi ubicación actual',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

@@ -445,7 +445,7 @@ class _Step5LocationConfirmedScreenState
                           Text(
                             _isLoadingLocation
                                 ? 'Obteniendo GPS...'
-                                : 'Usar mi ubicacion actual',
+                                : 'Usar mi ubicación actual',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
