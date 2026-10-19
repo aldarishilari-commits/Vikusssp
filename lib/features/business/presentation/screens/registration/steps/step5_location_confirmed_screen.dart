@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
@@ -34,6 +35,9 @@ class _Step5LocationConfirmedScreenState
       GlobalKey<RegistrationMapViewState>();
   final GooglePlacesService _placesService = GooglePlacesService();
   bool _isLoadingLocation = false;
+  bool _isSearching = false;
+  List<PlacePrediction> _predictions = [];
+  Timer? _debounceTimer;
 
   static const Map<String, LatLng> _knownCityCoordinates = {
     'la paz': LatLng(-16.5000, -68.1250),
@@ -72,15 +76,82 @@ class _Step5LocationConfirmedScreenState
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _addressController.dispose();
     super.dispose();
   }
 
   void _clearSearch() {
     setState(() {
+      _debounceTimer?.cancel();
       _addressController.clear();
+      _predictions = [];
+      _isSearching = false;
       widget.data.address = '';
     });
+  }
+
+  void _onAddressChanged(String query) {
+    widget.data.address = query;
+    _debounceTimer?.cancel();
+    final clean = query.trim().toLowerCase();
+    if (clean.isEmpty) {
+      setState(() {
+        _predictions = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    if (_knownCityCoordinates.containsKey(clean)) {
+      final target = _knownCityCoordinates[clean]!;
+      widget.data.latitude = target.latitude;
+      widget.data.longitude = target.longitude;
+      _mapKey.currentState?.animateToLocation(target);
+    }
+
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      if (!mounted) return;
+      setState(() => _isSearching = true);
+
+      final results = await _placesService.getAutocompletePredictions(
+        query,
+        biasLat: widget.data.latitude,
+        biasLng: widget.data.longitude,
+      );
+
+      if (mounted) {
+        setState(() {
+          _predictions = results;
+          _isSearching = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _selectPrediction(PlacePrediction prediction) async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _predictions = [];
+      _addressController.text = prediction.mainText;
+    });
+
+    final details = await _placesService.getPlaceDetails(prediction.placeId);
+    if (details != null && mounted) {
+      setState(() {
+        widget.data.address = details.address.isNotEmpty
+            ? details.address
+            : prediction.description;
+        widget.data.latitude = details.latitude;
+        widget.data.longitude = details.longitude;
+        widget.data.isLocationConfirmed = true;
+        _addressController.text = widget.data.address;
+      });
+
+      _mapKey.currentState?.animateToLocation(
+        LatLng(details.latitude, details.longitude),
+      );
+    }
   }
 
   Future<void> _searchAddress(String query) async {
@@ -95,29 +166,22 @@ class _Step5LocationConfirmedScreenState
         widget.data.latitude = target.latitude;
         widget.data.longitude = target.longitude;
         widget.data.address = query.trim();
+        _predictions = [];
       });
       _mapKey.currentState?.animateToLocation(target);
       return;
     }
 
-    final results = await _placesService.getAutocompletePredictions(query.trim());
+    setState(() => _isSearching = true);
+    final results = await _placesService.getAutocompletePredictions(
+      query.trim(),
+      biasLat: widget.data.latitude,
+      biasLng: widget.data.longitude,
+    );
     if (results.isNotEmpty && mounted) {
-      final details = await _placesService.getPlaceDetails(results.first.placeId);
-      if (details != null && mounted) {
-        setState(() {
-          widget.data.address = details.address.isNotEmpty
-              ? details.address
-              : results.first.description;
-          widget.data.latitude = details.latitude;
-          widget.data.longitude = details.longitude;
-          widget.data.isLocationConfirmed = true;
-          _addressController.text = widget.data.address;
-        });
-        _mapKey.currentState?.animateToLocation(
-          LatLng(details.latitude, details.longitude),
-        );
-      }
+      await _selectPrediction(results.first);
     }
+    if (mounted) setState(() => _isSearching = false);
   }
 
   Future<void> _useCurrentLocation() async {
@@ -242,12 +306,22 @@ class _Step5LocationConfirmedScreenState
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 12),
                     ),
-                    onChanged: (val) {
-                      widget.data.address = val;
-                    },
+                    onChanged: _onAddressChanged,
                     onSubmitted: _searchAddress,
                   ),
                 ),
+                if (_isSearching)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF7C3AED),
+                      ),
+                    ),
+                  ),
                 GestureDetector(
                   onTap: _clearSearch,
                   child: const Padding(
@@ -262,6 +336,64 @@ class _Step5LocationConfirmedScreenState
               ],
             ),
           ),
+
+          // Sugerencias predictivas de Geoapify
+          if (_predictions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              constraints: const BoxConstraints(maxHeight: 180),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE5E0EA)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                itemCount: _predictions.length,
+                separatorBuilder: (_, index) =>
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                itemBuilder: (context, index) {
+                  final pred = _predictions[index];
+                  return ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    leading: const Icon(
+                      Icons.location_on_outlined,
+                      size: 18,
+                      color: Color(0xFF7C3AED),
+                    ),
+                    title: Text(
+                      pred.mainText,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1F2937),
+                      ),
+                    ),
+                    subtitle: pred.secondaryText.isNotEmpty
+                        ? Text(
+                            pred.secondaryText,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF6B7280),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : null,
+                    onTap: () => _selectPrediction(pred),
+                  );
+                },
+              ),
+            ),
 
           const SizedBox(height: 18),
 

@@ -135,7 +135,11 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
         _isSearching = true;
       });
 
-      final results = await _placesService.getAutocompletePredictions(query);
+      final results = await _placesService.getAutocompletePredictions(
+        query,
+        biasLat: widget.data.latitude,
+        biasLng: widget.data.longitude,
+      );
       if (mounted) {
         setState(() {
           _predictions = results;
@@ -166,7 +170,11 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
 
     // 2. Búsqueda por predicciones de Places
     setState(() => _isSearching = true);
-    final results = await _placesService.getAutocompletePredictions(query.trim());
+    final results = await _placesService.getAutocompletePredictions(
+      query.trim(),
+      biasLat: widget.data.latitude,
+      biasLng: widget.data.longitude,
+    );
     if (results.isNotEmpty && mounted) {
       await _selectPrediction(results.first);
     }

@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/google_maps_config.dart';
+import 'geoapify_service.dart';
 
-/// Modelo para una sugerencia de búsqueda de Google Places / OpenStreetMap Nominatim
+/// Modelo para una sugerencia de búsqueda de lugares
 class PlacePrediction {
   final String placeId;
   final String description;
@@ -42,12 +43,14 @@ class PlaceLocationResult {
   });
 }
 
-/// Servicio híbrido para interactuar con Google Places y OpenStreetMap Nominatim
+/// Servicio híbrido para interactuar con Geoapify, Google Places y OSM Nominatim
 class GooglePlacesService {
   final http.Client _client;
+  final GeoapifyService _geoapifyService;
 
   GooglePlacesService({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client(),
+        _geoapifyService = GeoapifyService(client: client);
 
   List<String> get _candidateKeys => [
         GoogleMapsConfig.mapsJsApiKey,
@@ -55,11 +58,25 @@ class GooglePlacesService {
       ];
 
   /// Obtiene predicciones de autocompletado para una consulta de texto
-  Future<List<PlacePrediction>> getAutocompletePredictions(String query) async {
+  Future<List<PlacePrediction>> getAutocompletePredictions(
+    String query, {
+    double? biasLat,
+    double? biasLng,
+  }) async {
     final cleanQuery = query.trim();
     if (cleanQuery.isEmpty) return [];
 
-    // 1. Intento con Google Places API
+    // 1. Primario: Geoapify Autocomplete
+    final geoapifyResults = await _geoapifyService.getAutocompletePredictions(
+      cleanQuery,
+      biasLat: biasLat,
+      biasLng: biasLng,
+    );
+    if (geoapifyResults.isNotEmpty) {
+      return geoapifyResults;
+    }
+
+    // 2. Intento con Google Places API
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
@@ -87,7 +104,7 @@ class GooglePlacesService {
       } catch (_) {}
     }
 
-    // 2. Fallback a OpenStreetMap Nominatim
+    // 3. Fallback a OpenStreetMap Nominatim
     return _searchNominatim(cleanQuery);
   }
 
@@ -141,7 +158,12 @@ class GooglePlacesService {
   Future<PlaceLocationResult?> getPlaceDetails(String placeId) async {
     if (placeId.isEmpty) return null;
 
-    // Si es un ID de OpenStreetMap Nominatim
+    // 1. Si es un ID de Geoapify
+    if (placeId.startsWith('geoapify_')) {
+      return _geoapifyService.getPlaceDetails(placeId);
+    }
+
+    // 2. Si es un ID de OpenStreetMap Nominatim
     if (placeId.startsWith('osm_')) {
       final parts = placeId.split('_');
       if (parts.length >= 4) {
@@ -158,7 +180,7 @@ class GooglePlacesService {
       }
     }
 
-    // Intento con Google Places API
+    // 3. Intento con Google Places API
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/details/json'
@@ -199,8 +221,16 @@ class GooglePlacesService {
   }
 
   /// Convierte coordenadas geográficas en una dirección legible (Reverse Geocoding)
+  /// Utiliza Geoapify como motor primario para la geocodificación a la inversa
   Future<String?> reverseGeocode(double latitude, double longitude) async {
-    // 1. Intento con Google Maps Geocoding API
+    // 1. Primario: Geoapify Reverse Geocoding
+    final geoapifyResult =
+        await _geoapifyService.reverseGeocode(latitude, longitude);
+    if (geoapifyResult != null && geoapifyResult.isNotEmpty) {
+      return geoapifyResult;
+    }
+
+    // 2. Fallback: Google Maps Geocoding API
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/geocode/json'
@@ -227,11 +257,11 @@ class GooglePlacesService {
       } catch (_) {}
     }
 
-    // 2. Fallback con OpenStreetMap Nominatim
+    // 3. Fallback con OpenStreetMap Nominatim
     return _reverseGeocodeNominatim(latitude, longitude);
   }
 
-  /// Geocodificación inversa con OpenStreetMap Nominatim
+  /// Geocodificación inversa de respaldo con OpenStreetMap Nominatim
   Future<String?> _reverseGeocodeNominatim(
       double latitude, double longitude) async {
     try {
