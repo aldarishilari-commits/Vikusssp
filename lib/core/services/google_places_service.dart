@@ -43,7 +43,7 @@ class PlaceLocationResult {
   });
 }
 
-/// Servicio híbrido para interactuar con Geoapify, Google Places y OSM Nominatim
+/// Servicio híbrido para interactuar con Google Places, Geoapify y OSM Nominatim
 class GooglePlacesService {
   final http.Client _client;
   final GeoapifyService _geoapifyService;
@@ -57,7 +57,8 @@ class GooglePlacesService {
         GoogleMapsConfig.apiKey,
       ];
 
-  /// Obtiene predicciones de autocompletado para una consulta de texto
+  /// Obtiene predicciones de autocompletado para una consulta de texto.
+  /// Utiliza Google Places Autocomplete API como motor principal.
   Future<List<PlacePrediction>> getAutocompletePredictions(
     String query, {
     double? biasLat,
@@ -66,24 +67,23 @@ class GooglePlacesService {
     final cleanQuery = query.trim();
     if (cleanQuery.isEmpty) return [];
 
-    // 1. Primario: Geoapify Autocomplete
-    final geoapifyResults = await _geoapifyService.getAutocompletePredictions(
-      cleanQuery,
-      biasLat: biasLat,
-      biasLng: biasLng,
-    );
-    if (geoapifyResults.isNotEmpty) {
-      return geoapifyResults;
-    }
-
-    // 2. Intento con Google Places API
+    // 1. Primario: Google Places Autocomplete API
     for (final key in _candidateKeys) {
+      final queryParams = <String, String>{
+        'input': cleanQuery,
+        'key': key,
+        'language': 'es',
+        'components': 'country:bo', // Prioridad en Bolivia
+      };
+
+      if (biasLat != null && biasLng != null) {
+        queryParams['location'] = '$biasLat,$biasLng';
+        queryParams['radius'] = '50000'; // 50 km de radio de búsqueda
+      }
+
       final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-        '?input=${Uri.encodeComponent(cleanQuery)}'
-        '&key=$key'
-        '&language=es',
-      );
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json',
+      ).replace(queryParameters: queryParams);
 
       try {
         final response = await _client.get(url);
@@ -99,12 +99,45 @@ class GooglePlacesService {
                       PlacePrediction.fromJson(p as Map<String, dynamic>))
                   .toList();
             }
+          } else if (status == 'ZERO_RESULTS') {
+            // Intento sin restricción de país si no hubo resultados locales
+            final globalUrl = Uri.parse(
+              'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+              '?input=${Uri.encodeComponent(cleanQuery)}'
+              '&key=$key'
+              '&language=es',
+            );
+            final globalRes = await _client.get(globalUrl);
+            if (globalRes.statusCode == 200) {
+              final globalData =
+                  jsonDecode(globalRes.body) as Map<String, dynamic>;
+              if (globalData['status'] == 'OK') {
+                final globalPreds =
+                    globalData['predictions'] as List<dynamic>? ?? [];
+                if (globalPreds.isNotEmpty) {
+                  return globalPreds
+                      .map((p) =>
+                          PlacePrediction.fromJson(p as Map<String, dynamic>))
+                      .toList();
+                }
+              }
+            }
           }
         }
       } catch (_) {}
     }
 
-    // 3. Fallback a OpenStreetMap Nominatim
+    // 2. Fallback: Geoapify Autocomplete
+    final geoapifyResults = await _geoapifyService.getAutocompletePredictions(
+      cleanQuery,
+      biasLat: biasLat,
+      biasLng: biasLng,
+    );
+    if (geoapifyResults.isNotEmpty) {
+      return geoapifyResults;
+    }
+
+    // 3. Fallback: OpenStreetMap Nominatim
     return _searchNominatim(cleanQuery);
   }
 
@@ -158,12 +191,52 @@ class GooglePlacesService {
   Future<PlaceLocationResult?> getPlaceDetails(String placeId) async {
     if (placeId.isEmpty) return null;
 
-    // 1. Si es un ID de Geoapify
+    // 1. Si no es un ID con prefijo de Geoapify u OSM, es de Google Places:
+    if (!placeId.startsWith('geoapify_') && !placeId.startsWith('osm_')) {
+      for (final key in _candidateKeys) {
+        final url = Uri.parse(
+          'https://maps.googleapis.com/maps/api/place/details/json'
+          '?place_id=$placeId'
+          '&fields=geometry,formatted_address,name'
+          '&key=$key'
+          '&language=es',
+        );
+
+        try {
+          final response = await _client.get(url);
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body) as Map<String, dynamic>;
+            if (data['status'] == 'OK') {
+              final result = data['result'] as Map<String, dynamic>?;
+              final geometry = result?['geometry'] as Map<String, dynamic>?;
+              final location = geometry?['location'] as Map<String, dynamic>?;
+
+              if (location != null) {
+                final lat = (location['lat'] as num).toDouble();
+                final lng = (location['lng'] as num).toDouble();
+                final formattedAddress =
+                    result?['formatted_address'] as String? ??
+                        result?['name'] as String? ??
+                        '';
+
+                return PlaceLocationResult(
+                  address: formattedAddress,
+                  latitude: lat,
+                  longitude: lng,
+                );
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Si es un ID de Geoapify:
     if (placeId.startsWith('geoapify_')) {
       return _geoapifyService.getPlaceDetails(placeId);
     }
 
-    // 2. Si es un ID de OpenStreetMap Nominatim
+    // 3. Si es un ID de OpenStreetMap Nominatim:
     if (placeId.startsWith('osm_')) {
       final parts = placeId.split('_');
       if (parts.length >= 4) {
@@ -180,57 +253,19 @@ class GooglePlacesService {
       }
     }
 
-    // 3. Intento con Google Places API
-    for (final key in _candidateKeys) {
-      final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/details/json'
-        '?place_id=$placeId'
-        '&fields=geometry,formatted_address,name'
-        '&key=$key'
-        '&language=es',
-      );
-
-      try {
-        final response = await _client.get(url);
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
-          if (data['status'] == 'OK') {
-            final result = data['result'] as Map<String, dynamic>?;
-            final geometry = result?['geometry'] as Map<String, dynamic>?;
-            final location = geometry?['location'] as Map<String, dynamic>?;
-
-            if (location != null) {
-              final lat = (location['lat'] as num).toDouble();
-              final lng = (location['lng'] as num).toDouble();
-              final formattedAddress =
-                  result?['formatted_address'] as String? ??
-                      result?['name'] as String? ??
-                      '';
-
-              return PlaceLocationResult(
-                address: formattedAddress,
-                latitude: lat,
-                longitude: lng,
-              );
-            }
-          }
-        }
-      } catch (_) {}
-    }
     return null;
   }
 
   /// Convierte coordenadas geográficas en una dirección legible (Reverse Geocoding)
-  /// Utiliza Geoapify como motor primario para la geocodificación a la inversa
   Future<String?> reverseGeocode(double latitude, double longitude) async {
-    // 1. Primario: Geoapify Reverse Geocoding
+    // 1. Geoapify Reverse Geocoding (para direcciones con numeración y barrio)
     final geoapifyResult =
         await _geoapifyService.reverseGeocode(latitude, longitude);
     if (geoapifyResult != null && geoapifyResult.isNotEmpty) {
       return geoapifyResult;
     }
 
-    // 2. Fallback: Google Maps Geocoding API
+    // 2. Google Maps Geocoding API
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/geocode/json'
