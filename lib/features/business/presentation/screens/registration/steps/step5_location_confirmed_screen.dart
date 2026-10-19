@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:aeronpulse/core/services/location_service.dart';
 import 'package:aeronpulse/core/services/google_places_service.dart';
 import 'package:aeronpulse/features/business/domain/models/business_registration_model.dart';

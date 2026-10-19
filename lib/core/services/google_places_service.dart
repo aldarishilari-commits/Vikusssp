@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/google_maps_config.dart';
 
-/// Modelo para una sugerencia de búsqueda de Google Places
+/// Modelo para una sugerencia de búsqueda de Google Places / OpenStreetMap Nominatim
 class PlacePrediction {
   final String placeId;
   final String description;
@@ -42,7 +42,7 @@ class PlaceLocationResult {
   });
 }
 
-/// Servicio para interactuar con Google Places Autocomplete, Details y Geocoding API
+/// Servicio híbrido para interactuar con Google Places y OpenStreetMap Nominatim
 class GooglePlacesService {
   final http.Client _client;
 
@@ -56,12 +56,14 @@ class GooglePlacesService {
 
   /// Obtiene predicciones de autocompletado para una consulta de texto
   Future<List<PlacePrediction>> getAutocompletePredictions(String query) async {
-    if (query.trim().isEmpty) return [];
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) return [];
 
+    // 1. Intento con Google Places API
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-        '?input=${Uri.encodeComponent(query)}'
+        '?input=${Uri.encodeComponent(cleanQuery)}'
         '&key=$key'
         '&language=es',
       );
@@ -72,15 +74,66 @@ class GooglePlacesService {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           final status = data['status'] as String?;
 
-          if (status == 'OK' || status == 'ZERO_RESULTS') {
+          if (status == 'OK') {
             final predictions = data['predictions'] as List<dynamic>? ?? [];
-            return predictions
-                .map((p) => PlacePrediction.fromJson(p as Map<String, dynamic>))
-                .toList();
+            if (predictions.isNotEmpty) {
+              return predictions
+                  .map((p) =>
+                      PlacePrediction.fromJson(p as Map<String, dynamic>))
+                  .toList();
+            }
           }
         }
       } catch (_) {}
     }
+
+    // 2. Fallback a OpenStreetMap Nominatim
+    return _searchNominatim(cleanQuery);
+  }
+
+  /// Búsqueda con OpenStreetMap Nominatim
+  Future<List<PlacePrediction>> _searchNominatim(String query) async {
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/search'
+        '?format=json'
+        '&q=${Uri.encodeComponent(query)}'
+        '&countrycodes=bo'
+        '&limit=6'
+        '&addressdetails=1',
+      );
+
+      final response = await _client.get(
+        url,
+        headers: {
+          'User-Agent': 'AeronpulseApp/1.0 (osm@aeronpulse.app)',
+          'Accept-Language': 'es',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final list =
+            jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+        return list.map((item) {
+          final map = item as Map<String, dynamic>;
+          final displayName = map['display_name'] as String? ?? '';
+          final parts = displayName.split(',');
+          final main = parts.isNotEmpty ? parts.first.trim() : displayName;
+          final secondary =
+              parts.length > 1 ? parts.sublist(1).join(',').trim() : '';
+
+          final lat = map['lat']?.toString() ?? '0';
+          final lon = map['lon']?.toString() ?? '0';
+
+          return PlacePrediction(
+            placeId: 'osm_${map['place_id']}_${lat}_$lon',
+            description: displayName,
+            mainText: main,
+            secondaryText: secondary,
+          );
+        }).toList();
+      }
+    } catch (_) {}
     return [];
   }
 
@@ -88,6 +141,24 @@ class GooglePlacesService {
   Future<PlaceLocationResult?> getPlaceDetails(String placeId) async {
     if (placeId.isEmpty) return null;
 
+    // Si es un ID de OpenStreetMap Nominatim
+    if (placeId.startsWith('osm_')) {
+      final parts = placeId.split('_');
+      if (parts.length >= 4) {
+        final lat = double.tryParse(parts[2]);
+        final lng = double.tryParse(parts[3]);
+        if (lat != null && lng != null) {
+          final address = await reverseGeocode(lat, lng) ?? '';
+          return PlaceLocationResult(
+            address: address,
+            latitude: lat,
+            longitude: lng,
+          );
+        }
+      }
+    }
+
+    // Intento con Google Places API
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/details/json'
@@ -129,6 +200,7 @@ class GooglePlacesService {
 
   /// Convierte coordenadas geográficas en una dirección legible (Reverse Geocoding)
   Future<String?> reverseGeocode(double latitude, double longitude) async {
+    // 1. Intento con Google Maps Geocoding API
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/geocode/json'
@@ -145,12 +217,62 @@ class GooglePlacesService {
             final results = data['results'] as List<dynamic>?;
             if (results != null && results.isNotEmpty) {
               final first = results.first as Map<String, dynamic>;
-              return first['formatted_address'] as String?;
+              final formatted = first['formatted_address'] as String?;
+              if (formatted != null && formatted.isNotEmpty) {
+                return formatted;
+              }
             }
           }
         }
       } catch (_) {}
     }
+
+    // 2. Fallback con OpenStreetMap Nominatim
+    return _reverseGeocodeNominatim(latitude, longitude);
+  }
+
+  /// Geocodificación inversa con OpenStreetMap Nominatim
+  Future<String?> _reverseGeocodeNominatim(
+      double latitude, double longitude) async {
+    try {
+      final url = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse'
+        '?format=json'
+        '&lat=$latitude'
+        '&lon=$longitude'
+        '&zoom=18'
+        '&addressdetails=1',
+      );
+
+      final response = await _client.get(
+        url,
+        headers: {
+          'User-Agent': 'AeronpulseApp/1.0 (osm@aeronpulse.app)',
+          'Accept-Language': 'es',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data =
+            jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+        final address = data['address'] as Map<String, dynamic>?;
+        if (address != null) {
+          final road = address['road'] ??
+              address['pedestrian'] ??
+              address['suburb'] ??
+              address['neighbourhood'];
+          final city = address['city'] ??
+              address['town'] ??
+              address['village'] ??
+              address['municipality'] ??
+              address['state'];
+          if (road != null && city != null) {
+            return '$road, $city';
+          }
+        }
+        return data['display_name'] as String?;
+      }
+    } catch (_) {}
     return null;
   }
 }
