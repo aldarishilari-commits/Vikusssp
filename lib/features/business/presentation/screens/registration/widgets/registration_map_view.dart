@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
+import 'package:latlong2/latlong.dart' as osm;
 
 /// Widget de mapa interactivo para el registro de negocios en VikusApp.
-/// Utiliza Google Maps oficial con soporte para reubicar el pin al tocar,
-/// arrastrar el pin, controles táctiles y animaciones suaves de cámara.
+/// Utiliza OpenStreetMap (vía flutter_map) con soporte para reubicar el pin al tocar,
+/// controles de zoom y animaciones suaves de cámara sin depender de Google Maps visual.
 class RegistrationMapView extends StatefulWidget {
   final double latitude;
   final double longitude;
   final bool showPin;
   final bool isInteractive;
   final double height;
-  final ValueChanged<LatLng>? onLocationChanged;
+  final ValueChanged<gmaps.LatLng>? onLocationChanged;
   final String? locationName;
 
   const RegistrationMapView({
@@ -29,8 +31,9 @@ class RegistrationMapView extends StatefulWidget {
   State<RegistrationMapView> createState() => RegistrationMapViewState();
 }
 
-class RegistrationMapViewState extends State<RegistrationMapView> {
-  GoogleMapController? _mapController;
+class RegistrationMapViewState extends State<RegistrationMapView>
+    with TickerProviderStateMixin {
+  late final MapController _mapController;
   late double _currentLat;
   late double _currentLng;
   double _currentZoom = 15.5;
@@ -38,6 +41,7 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _currentLat = widget.latitude;
     _currentLng = widget.longitude;
   }
@@ -49,29 +53,88 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
         oldWidget.longitude != widget.longitude) {
       _currentLat = widget.latitude;
       _currentLng = widget.longitude;
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(LatLng(_currentLat, _currentLng)),
+      _animatedMapMove(
+        osm.LatLng(_currentLat, _currentLng),
+        _currentZoom,
       );
     }
   }
 
-  /// Mueve la cámara suavemente a una nueva posición
-  void animateToLocation(LatLng target, {double? zoom}) {
+  /// Mueve la cámara suavemente a una nueva posición (acepta latlong2.LatLng o google_maps_flutter.LatLng)
+  void animateToLocation(dynamic target, {double? zoom}) {
+    final double lat;
+    final double lng;
+    if (target is osm.LatLng) {
+      lat = target.latitude;
+      lng = target.longitude;
+    } else {
+      lat = (target.latitude as num).toDouble();
+      lng = (target.longitude as num).toDouble();
+    }
+
     setState(() {
-      _currentLat = target.latitude;
-      _currentLng = target.longitude;
+      _currentLat = lat;
+      _currentLng = lng;
       if (zoom != null) _currentZoom = zoom;
     });
 
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        target,
-        zoom ?? _currentZoom,
-      ),
+    _animatedMapMove(
+      osm.LatLng(lat, lng),
+      zoom ?? _currentZoom,
     );
   }
 
-  void _handleTap(LatLng position) {
+  void _animatedMapMove(osm.LatLng destLocation, double destZoom) {
+    try {
+      final camera = _mapController.camera;
+      final latTween = Tween<double>(
+        begin: camera.center.latitude,
+        end: destLocation.latitude,
+      );
+      final lngTween = Tween<double>(
+        begin: camera.center.longitude,
+        end: destLocation.longitude,
+      );
+      final zoomTween = Tween<double>(
+        begin: camera.zoom,
+        end: destZoom,
+      );
+
+      final controller = AnimationController(
+        duration: const Duration(milliseconds: 400),
+        vsync: this,
+      );
+
+      final Animation<double> animation = CurvedAnimation(
+        parent: controller,
+        curve: Curves.fastOutSlowIn,
+      );
+
+      controller.addListener(() {
+        _mapController.move(
+          osm.LatLng(
+            latTween.evaluate(animation),
+            lngTween.evaluate(animation),
+          ),
+          zoomTween.evaluate(animation),
+        );
+      });
+
+      animation.addStatusListener((status) {
+        if (status == AnimationStatus.completed ||
+            status == AnimationStatus.dismissed) {
+          controller.dispose();
+        }
+      });
+
+      controller.forward();
+    } catch (_) {
+      // Fallback si la cámara aún no está inicializada
+      _mapController.move(destLocation, destZoom);
+    }
+  }
+
+  void _handleTap(osm.LatLng position) {
     if (!widget.isInteractive) return;
 
     setState(() {
@@ -79,46 +142,20 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
       _currentLng = position.longitude;
     });
 
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(position),
+    _animatedMapMove(position, _currentZoom);
+    widget.onLocationChanged?.call(
+      gmaps.LatLng(position.latitude, position.longitude),
     );
-
-    widget.onLocationChanged?.call(position);
   }
 
   void _recenterOnPin() {
-    final pinPos = LatLng(_currentLat, _currentLng);
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(pinPos, _currentZoom),
-    );
+    final pinPos = osm.LatLng(_currentLat, _currentLng);
+    _animatedMapMove(pinPos, _currentZoom);
   }
 
   @override
   Widget build(BuildContext context) {
-    final LatLng pinPosition = LatLng(_currentLat, _currentLng);
-
-    final Set<Marker> markers = widget.showPin
-        ? {
-            Marker(
-              markerId: const MarkerId('business_pin'),
-              position: pinPosition,
-              draggable: widget.isInteractive,
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueViolet),
-              onDragEnd: (newPosition) {
-                setState(() {
-                  _currentLat = newPosition.latitude;
-                  _currentLng = newPosition.longitude;
-                });
-                widget.onLocationChanged?.call(newPosition);
-              },
-              infoWindow: widget.locationName != null &&
-                      widget.locationName!.isNotEmpty
-                  ? InfoWindow(title: widget.locationName)
-                  : const InfoWindow(title: 'Ubicación de tu negocio'),
-            ),
-          }
-        : {};
+    final osm.LatLng pinPosition = osm.LatLng(_currentLat, _currentLng);
 
     return Container(
       height: widget.height,
@@ -142,35 +179,48 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
         borderRadius: BorderRadius.circular(16.5),
         child: Stack(
           children: [
-            // 1. Google Maps Oficial
-            GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: pinPosition,
-                zoom: _currentZoom,
+            // 1. OpenStreetMap con flutter_map
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: pinPosition,
+                initialZoom: _currentZoom,
+                minZoom: 3.0,
+                maxZoom: 18.5,
+                onTap: (tapPosition, point) => _handleTap(point),
+                interactionOptions: InteractionOptions(
+                  flags: widget.isInteractive
+                      ? InteractiveFlag.all
+                      : InteractiveFlag.none,
+                ),
               ),
-              onMapCreated: (controller) {
-                _mapController = controller;
-              },
-              onTap: _handleTap,
-              markers: markers,
-              myLocationEnabled: false,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: false,
-              scrollGesturesEnabled: widget.isInteractive,
-              zoomGesturesEnabled: widget.isInteractive,
-              rotateGesturesEnabled: widget.isInteractive,
-              tiltGesturesEnabled: false,
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.aeronpulse.app',
+                ),
+                if (widget.showPin)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: pinPosition,
+                        width: 44,
+                        height: 52,
+                        alignment: Alignment.topCenter,
+                        child: _buildPinWidget(),
+                      ),
+                    ],
+                  ),
+              ],
             ),
 
-            // 2. Etiqueta flotante Google Maps
+            // 2. Etiqueta flotante OpenStreetMap
             Positioned(
               top: 12,
               left: 12,
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.94),
                   borderRadius: BorderRadius.circular(8),
@@ -187,13 +237,13 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(
-                      Icons.place_rounded,
+                      Icons.map_rounded,
                       size: 13,
-                      color: Color(0xFFEA4335), // Google Red
+                      color: Color(0xFF0284C7), // Sky blue
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      'Google Maps',
+                      'OpenStreetMap',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -273,9 +323,10 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
                       icon: Icons.add_rounded,
                       tooltip: 'Acercar',
                       onTap: () {
-                        _currentZoom = (_currentZoom + 1).clamp(3.0, 20.0);
-                        _mapController?.animateCamera(
-                          CameraUpdate.zoomIn(),
+                        _currentZoom = (_currentZoom + 1).clamp(3.0, 18.0);
+                        _animatedMapMove(
+                          osm.LatLng(_currentLat, _currentLng),
+                          _currentZoom,
                         );
                       },
                     ),
@@ -284,9 +335,10 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
                       icon: Icons.remove_rounded,
                       tooltip: 'Alejar',
                       onTap: () {
-                        _currentZoom = (_currentZoom - 1).clamp(3.0, 20.0);
-                        _mapController?.animateCamera(
-                          CameraUpdate.zoomOut(),
+                        _currentZoom = (_currentZoom - 1).clamp(3.0, 18.0);
+                        _animatedMapMove(
+                          osm.LatLng(_currentLat, _currentLng),
+                          _currentZoom,
                         );
                       },
                     ),
@@ -303,6 +355,43 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPinWidget() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF7C3AED).withValues(alpha: 0.45),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.storefront_rounded,
+            size: 20,
+            color: Colors.white,
+          ),
+        ),
+        CustomPaint(
+          size: const Size(10, 6),
+          painter: _TrianglePainter(color: const Color(0xFF6D28D9)),
+        ),
+      ],
     );
   }
 
@@ -341,3 +430,25 @@ class RegistrationMapViewState extends State<RegistrationMapView> {
     );
   }
 }
+
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+  _TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
