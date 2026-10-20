@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:aeronpulse/core/services/google_places_service.dart';
+import 'package:aeronpulse/core/services/geoapify_service.dart';
 import 'package:aeronpulse/core/services/location_service.dart';
 import 'package:aeronpulse/features/business/domain/models/business_registration_model.dart';
 import 'package:aeronpulse/features/business/presentation/screens/registration/widgets/registration_map_view.dart';
@@ -31,7 +31,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
   late final TextEditingController _searchController;
   final GlobalKey<RegistrationMapViewState> _mapKey =
       GlobalKey<RegistrationMapViewState>();
-  final GooglePlacesService _placesService = GooglePlacesService();
+  final GeoapifyService _placesService = GeoapifyService();
 
   bool _isLoadingLocation = false;
   bool _isSearching = false;
@@ -186,7 +186,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
     // Prioridad a la dirección concisa: ej. "Piedras 57", "Av. Belgrano 300"
     final concise = prediction.mainText.isNotEmpty
         ? prediction.mainText
-        : GooglePlacesService.toShortAddress(prediction.description);
+        : GeoapifyService.toShortAddress(prediction.description);
 
     setState(() {
       _predictions = [];
@@ -226,7 +226,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
       // Reverse geocode to get real street address
       final address = await _placesService.reverseGeocode(lat, lng);
       final finalAddress = address != null
-          ? GooglePlacesService.toShortAddress(address)
+          ? GeoapifyService.toShortAddress(address)
           : 'Ubicación actual (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
 
       setState(() {
@@ -263,7 +263,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
     if (mounted) {
       setState(() {
         if (address != null && address.isNotEmpty) {
-          final concise = GooglePlacesService.toShortAddress(address);
+          final concise = GeoapifyService.toShortAddress(address);
           widget.data.address = concise;
           _searchController.text = concise;
         }

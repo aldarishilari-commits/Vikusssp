@@ -3,47 +3,14 @@ import 'package:http/http.dart' as http;
 import '../config/google_maps_config.dart';
 import 'geoapify_service.dart';
 
-/// Modelo para una sugerencia de búsqueda de lugares
-class PlacePrediction {
-  final String placeId;
-  final String description;
-  final String mainText;
-  final String secondaryText;
+export 'geoapify_service.dart'
+    show
+        PlacePrediction,
+        PlaceLocationResult,
+        GeoapifyPlaceItem,
+        GeoapifyService,
+        GeoapifyReverseResult;
 
-  const PlacePrediction({
-    required this.placeId,
-    required this.description,
-    required this.mainText,
-    required this.secondaryText,
-  });
-
-  factory PlacePrediction.fromJson(Map<String, dynamic> json) {
-    final structured = json['structured_formatting'] as Map<String, dynamic>?;
-    return PlacePrediction(
-      placeId: json['place_id'] as String? ?? '',
-      description: json['description'] as String? ?? '',
-      mainText: structured?['main_text'] as String? ??
-          json['description'] as String? ??
-          '',
-      secondaryText: structured?['secondary_text'] as String? ?? '',
-    );
-  }
-}
-
-/// Modelo para el detalle de ubicación obtenido de un lugar
-class PlaceLocationResult {
-  final String address;
-  final String shortAddress;
-  final double latitude;
-  final double longitude;
-
-  const PlaceLocationResult({
-    required this.address,
-    String? shortAddress,
-    required this.latitude,
-    required this.longitude,
-  }) : shortAddress = shortAddress ?? address;
-}
 
 /// Servicio híbrido para interactuar con Google Places, Geoapify y OSM Nominatim
 class GooglePlacesService {

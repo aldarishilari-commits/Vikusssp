@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:aeronpulse/core/services/location_service.dart';
-import 'package:aeronpulse/core/services/google_places_service.dart';
+import 'package:aeronpulse/core/services/geoapify_service.dart';
 import 'package:aeronpulse/features/business/domain/models/business_registration_model.dart';
 import 'package:aeronpulse/features/business/presentation/screens/registration/widgets/registration_map_view.dart';
 import 'package:aeronpulse/features/business/presentation/screens/registration/widgets/registration_shared_widgets.dart';
@@ -33,7 +33,7 @@ class _Step5LocationConfirmedScreenState
   late final TextEditingController _addressController;
   final GlobalKey<RegistrationMapViewState> _mapKey =
       GlobalKey<RegistrationMapViewState>();
-  final GooglePlacesService _placesService = GooglePlacesService();
+  final GeoapifyService _placesService = GeoapifyService();
   bool _isLoadingLocation = false;
   bool _isSearching = false;
   List<PlacePrediction> _predictions = [];
@@ -133,7 +133,7 @@ class _Step5LocationConfirmedScreenState
     FocusScope.of(context).unfocus();
     final concise = prediction.mainText.isNotEmpty
         ? prediction.mainText
-        : GooglePlacesService.toShortAddress(prediction.description);
+        : GeoapifyService.toShortAddress(prediction.description);
 
     setState(() {
       _predictions = [];
@@ -200,7 +200,7 @@ class _Step5LocationConfirmedScreenState
         position.longitude,
       );
       final finalAddress = address != null
-          ? GooglePlacesService.toShortAddress(address)
+          ? GeoapifyService.toShortAddress(address)
           : 'Ubicación actual';
 
       setState(() {
@@ -233,7 +233,7 @@ class _Step5LocationConfirmedScreenState
     );
 
     if (mounted && address != null && address.isNotEmpty) {
-      final concise = GooglePlacesService.toShortAddress(address);
+      final concise = GeoapifyService.toShortAddress(address);
       setState(() {
         widget.data.address = concise;
         _addressController.text = concise;
