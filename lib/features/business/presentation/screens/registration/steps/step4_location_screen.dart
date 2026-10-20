@@ -112,7 +112,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
   void _onSearchChanged(String query) {
     _debounceTimer?.cancel();
     final clean = query.trim().toLowerCase();
-    if (clean.isEmpty) {
+    if (clean.length < 2) {
       setState(() {
         _predictions = [];
         _isSearching = false;
@@ -129,7 +129,7 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
       _mapKey.currentState?.animateToLocation(target);
     }
 
-    _debounceTimer = Timer(const Duration(milliseconds: 350), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () async {
       if (!mounted) return;
       setState(() {
         _isSearching = true;
@@ -183,21 +183,25 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
 
   Future<void> _selectPrediction(PlacePrediction prediction) async {
     FocusScope.of(context).unfocus();
+    // Prioridad a la dirección concisa: ej. "Piedras 57", "Av. Belgrano 300"
+    final concise = prediction.mainText.isNotEmpty
+        ? prediction.mainText
+        : GooglePlacesService.toShortAddress(prediction.description);
+
     setState(() {
       _predictions = [];
-      _searchController.text = prediction.mainText;
+      _searchController.text = concise;
+      widget.data.address = concise;
     });
 
     final details = await _placesService.getPlaceDetails(prediction.placeId);
     if (details != null && mounted) {
       setState(() {
-        widget.data.address = details.address.isNotEmpty
-            ? details.address
-            : prediction.description;
+        widget.data.address = concise;
         widget.data.latitude = details.latitude;
         widget.data.longitude = details.longitude;
         widget.data.isLocationConfirmed = true;
-        _searchController.text = widget.data.address;
+        _searchController.text = concise;
       });
 
       _mapKey.currentState?.animateToLocation(
@@ -221,8 +225,9 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
 
       // Reverse geocode to get real street address
       final address = await _placesService.reverseGeocode(lat, lng);
-      final finalAddress = address ??
-          'Ubicación actual (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
+      final finalAddress = address != null
+          ? GooglePlacesService.toShortAddress(address)
+          : 'Ubicación actual (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
 
       setState(() {
         widget.data.latitude = lat;
@@ -258,8 +263,9 @@ class _Step4LocationScreenState extends State<Step4LocationScreen> {
     if (mounted) {
       setState(() {
         if (address != null && address.isNotEmpty) {
-          widget.data.address = address;
-          _searchController.text = address;
+          final concise = GooglePlacesService.toShortAddress(address);
+          widget.data.address = concise;
+          _searchController.text = concise;
         }
       });
     }

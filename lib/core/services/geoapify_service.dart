@@ -47,7 +47,8 @@ class GeoapifyReverseResult {
     final lat = (props['lat'] as num?)?.toDouble() ?? defaultLat;
     final lon = (props['lon'] as num?)?.toDouble() ?? defaultLng;
 
-    final cleanAddress = GeoapifyService.formatAddress(props);
+    final cleanAddress =
+        GeoapifyService.formatAddress(props, includeVenueName: false);
 
     return GeoapifyReverseResult(
       formatted: formatted,
@@ -76,8 +77,10 @@ class GeoapifyService {
   })  : _client = client ?? http.Client(),
         _apiKey = apiKey ?? GeoapifyConfig.apiKey;
 
-  /// Formatea las propiedades de Geoapify en una dirección limpia y legible
-  static String formatAddress(Map<String, dynamic> props) {
+  static String formatAddress(
+    Map<String, dynamic> props, {
+    bool includeVenueName = true,
+  }) {
     final street = props['street'] as String?;
     final houseNumber = props['housenumber'] as String?;
     final suburb =
@@ -94,7 +97,8 @@ class GeoapifyService {
               : street;
 
       final parts = <String>[];
-      if (name != null &&
+      if (includeVenueName &&
+          name != null &&
           name.isNotEmpty &&
           name != street &&
           name != houseNumber) {

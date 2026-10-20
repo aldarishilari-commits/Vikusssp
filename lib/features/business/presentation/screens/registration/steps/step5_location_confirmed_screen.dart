@@ -95,7 +95,7 @@ class _Step5LocationConfirmedScreenState
     widget.data.address = query;
     _debounceTimer?.cancel();
     final clean = query.trim().toLowerCase();
-    if (clean.isEmpty) {
+    if (clean.length < 2) {
       setState(() {
         _predictions = [];
         _isSearching = false;
@@ -110,7 +110,7 @@ class _Step5LocationConfirmedScreenState
       _mapKey.currentState?.animateToLocation(target);
     }
 
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () async {
       if (!mounted) return;
       setState(() => _isSearching = true);
 
@@ -131,21 +131,24 @@ class _Step5LocationConfirmedScreenState
 
   Future<void> _selectPrediction(PlacePrediction prediction) async {
     FocusScope.of(context).unfocus();
+    final concise = prediction.mainText.isNotEmpty
+        ? prediction.mainText
+        : GooglePlacesService.toShortAddress(prediction.description);
+
     setState(() {
       _predictions = [];
-      _addressController.text = prediction.mainText;
+      _addressController.text = concise;
+      widget.data.address = concise;
     });
 
     final details = await _placesService.getPlaceDetails(prediction.placeId);
     if (details != null && mounted) {
       setState(() {
-        widget.data.address = details.address.isNotEmpty
-            ? details.address
-            : prediction.description;
+        widget.data.address = concise;
         widget.data.latitude = details.latitude;
         widget.data.longitude = details.longitude;
         widget.data.isLocationConfirmed = true;
-        _addressController.text = widget.data.address;
+        _addressController.text = concise;
       });
 
       _mapKey.currentState?.animateToLocation(
@@ -196,7 +199,9 @@ class _Step5LocationConfirmedScreenState
         position.latitude,
         position.longitude,
       );
-      final finalAddress = address ?? 'Ubicación actual';
+      final finalAddress = address != null
+          ? GooglePlacesService.toShortAddress(address)
+          : 'Ubicación actual';
 
       setState(() {
         widget.data.latitude = position.latitude;
@@ -228,9 +233,10 @@ class _Step5LocationConfirmedScreenState
     );
 
     if (mounted && address != null && address.isNotEmpty) {
+      final concise = GooglePlacesService.toShortAddress(address);
       setState(() {
-        widget.data.address = address;
-        _addressController.text = address;
+        widget.data.address = concise;
+        _addressController.text = concise;
       });
     }
   }

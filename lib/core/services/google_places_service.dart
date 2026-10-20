@@ -33,14 +33,16 @@ class PlacePrediction {
 /// Modelo para el detalle de ubicación obtenido de un lugar
 class PlaceLocationResult {
   final String address;
+  final String shortAddress;
   final double latitude;
   final double longitude;
 
   const PlaceLocationResult({
     required this.address,
+    String? shortAddress,
     required this.latitude,
     required this.longitude,
-  });
+  }) : shortAddress = shortAddress ?? address;
 }
 
 /// Servicio híbrido para interactuar con Google Places, Geoapify y OSM Nominatim
@@ -53,8 +55,8 @@ class GooglePlacesService {
         _geoapifyService = GeoapifyService(client: client);
 
   List<String> get _candidateKeys => [
-        GoogleMapsConfig.mapsJsApiKey,
         GoogleMapsConfig.apiKey,
+        GoogleMapsConfig.mapsJsApiKey,
       ];
 
   /// Obtiene predicciones de autocompletado para una consulta de texto.
@@ -67,13 +69,12 @@ class GooglePlacesService {
     final cleanQuery = query.trim();
     if (cleanQuery.isEmpty) return [];
 
-    // 1. Primario: Google Places Autocomplete API
+    // 1. Primario: Google Places Autocomplete API (con sesgo geográfico por cercanía)
     for (final key in _candidateKeys) {
       final queryParams = <String, String>{
         'input': cleanQuery,
         'key': key,
         'language': 'es',
-        'components': 'country:bo', // Prioridad en Bolivia
       };
 
       if (biasLat != null && biasLng != null) {
@@ -98,29 +99,6 @@ class GooglePlacesService {
                   .map((p) =>
                       PlacePrediction.fromJson(p as Map<String, dynamic>))
                   .toList();
-            }
-          } else if (status == 'ZERO_RESULTS') {
-            // Intento sin restricción de país si no hubo resultados locales
-            final globalUrl = Uri.parse(
-              'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-              '?input=${Uri.encodeComponent(cleanQuery)}'
-              '&key=$key'
-              '&language=es',
-            );
-            final globalRes = await _client.get(globalUrl);
-            if (globalRes.statusCode == 200) {
-              final globalData =
-                  jsonDecode(globalRes.body) as Map<String, dynamic>;
-              if (globalData['status'] == 'OK') {
-                final globalPreds =
-                    globalData['predictions'] as List<dynamic>? ?? [];
-                if (globalPreds.isNotEmpty) {
-                  return globalPreds
-                      .map((p) =>
-                          PlacePrediction.fromJson(p as Map<String, dynamic>))
-                      .toList();
-                }
-              }
             }
           }
         }
@@ -187,6 +165,238 @@ class GooglePlacesService {
     return [];
   }
 
+  /// Limpia códigos Plus Code y sufijos redundantes
+  static String cleanAddress(String raw) {
+    var clean = raw.trim();
+    // Remueve Plus Codes al inicio como "FW56+HM7, " o "FVPC+XV "
+    clean = clean.replaceAll(
+      RegExp(r'^[A-Z0-9]{4,8}\+[A-Z0-9]{2,4}(,\s*|\s+)?', caseSensitive: false),
+      '',
+    );
+    clean = clean.replaceAll(
+      RegExp(r'^[A-Z0-9]{2,4}\+[A-Z0-9]{2,4}(,\s*|\s+)?', caseSensitive: false),
+      '',
+    );
+    // Remueve ", Bolivia" al final para formato conciso y local
+    clean = clean.replaceAll(RegExp(r',\s*Bolivia$', caseSensitive: false), '');
+    clean = clean.replaceAll(RegExp(r',\s*Argentina$', caseSensitive: false), '');
+    return clean.trim();
+  }
+
+  /// Formatea la dirección en su versión corta y concisa para el perfil
+  /// (ej: "Piedras 57", "Av. Belgrano 300", "Av. Corrientes 59", "Av. 16 de Julio 1525")
+  static String toShortAddress(String raw) {
+    final cleaned = cleanAddress(raw);
+    if (cleaned.isEmpty) return raw.trim();
+    final firstPart = cleaned.split(',').first.trim();
+    return firstPart.isNotEmpty ? firstPart : cleaned;
+  }
+
+  /// Formatea la dirección obtenida en los detalles de un lugar de Google
+  static String formatPlaceDetailsAddress(
+      Map<String, dynamic>? result, String fallback) {
+    if (result == null) return cleanAddress(fallback);
+
+    final raw = result['formatted_address'] as String? ?? fallback;
+    final cleaned = cleanAddress(raw);
+
+    final comps = (result['address_components'] as List?) ?? [];
+    String? neighborhood;
+    String? sublocality;
+    String? city;
+
+    for (final comp in comps) {
+      final types = (comp['types'] as List).cast<String>();
+      final name = comp['long_name'] as String? ?? '';
+      if (name.isEmpty) continue;
+      if (types.contains('neighborhood')) {
+        neighborhood = name;
+      } else if (types.contains('sublocality') ||
+          types.contains('sublocality_level_1')) {
+        sublocality ??= name.replaceAll('Macrodistrito ', '');
+      }
+      if (types.contains('locality')) {
+        city = name;
+      }
+    }
+
+    final zone = neighborhood ?? sublocality;
+    if (cleaned.isNotEmpty && zone != null && zone.isNotEmpty) {
+      if (!cleaned.toLowerCase().contains(zone.toLowerCase())) {
+        if (city != null && cleaned.contains(city)) {
+          return cleaned.replaceFirst(city, '$zone, $city');
+        }
+        return '$cleaned, $zone';
+      }
+    }
+
+    return cleaned.isNotEmpty ? cleaned : cleanAddress(fallback);
+  }
+
+  /// Extrae la dirección más exacta, legible y sin nombres de locales ajenos
+  /// de los resultados de Google Geocoding API.
+  static String? extractExactAddressFromGoogle(List<dynamic> results) {
+    if (results.isEmpty) return null;
+
+    String? detectedNeighborhood;
+    String? detectedSublocality;
+    String? detectedCity;
+
+    // 1. Recorrer todos los resultados para capturar el barrio/zona y ciudad
+    for (final r in results) {
+      final comps = (r['address_components'] as List?) ?? [];
+      for (final comp in comps) {
+        final cTypes = (comp['types'] as List).cast<String>();
+        final name = comp['long_name'] as String? ?? '';
+        if (name.isEmpty) continue;
+        if (detectedNeighborhood == null && cTypes.contains('neighborhood')) {
+          detectedNeighborhood = name;
+        }
+        if (detectedSublocality == null &&
+            (cTypes.contains('sublocality') ||
+                cTypes.contains('sublocality_level_1'))) {
+          detectedSublocality = name.replaceAll('Macrodistrito ', '');
+        }
+        if (detectedCity == null && cTypes.contains('locality')) {
+          detectedCity = name;
+        }
+      }
+    }
+
+    final zone = detectedNeighborhood ?? detectedSublocality;
+
+    // 2. Puntuar candidatos para priorizar calles con numeración y descartar locales de terceros
+    Map<String, dynamic>? bestResult;
+    int bestScore = -99999;
+
+    const commercialTypes = [
+      'beauty_salon',
+      'store',
+      'hair_care',
+      'dentist',
+      'doctor',
+      'restaurant',
+      'cafe',
+      'bar',
+      'bank',
+      'atm',
+      'lodging',
+      'insurance_agency',
+      'health',
+      'shopping_mall',
+    ];
+
+    for (final r in results) {
+      final types = (r['types'] as List).cast<String>();
+      final formatted = r['formatted_address'] as String? ?? '';
+      int score = 0;
+
+      // Descartar o penalizar severamente Plus Codes
+      if (types.contains('plus_code') ||
+          RegExp(r'^[A-Z0-9]{4,8}\+').hasMatch(formatted)) {
+        score -= 500;
+      }
+
+      // Máxima prioridad a direcciones exactas con número o subpremisa
+      if (types.contains('street_address') || types.contains('subpremise')) {
+        score += 300;
+      } else if (types.contains('premise')) {
+        score += 200;
+      } else if (types.contains('route')) {
+        score += 150;
+      } else if (types.contains('intersection')) {
+        score += 120;
+      } else if (types.contains('neighborhood') ||
+          types.contains('sublocality')) {
+        score += 80;
+      }
+
+      // Penalizar comercios de terceros para evitar que ponga el nombre de otra tienda
+      if (types.any((t) => commercialTypes.contains(t))) {
+        score -= 90;
+      }
+
+      // Penalizar nombres truncados como "Calle 15 y,"
+      if (RegExp(r'\s+y,', caseSensitive: false).hasMatch(formatted)) {
+        score -= 100;
+      }
+
+      // Penalizar resultados demasiado generales (país, provincia o departamento)
+      if (types.contains('country') ||
+          types.contains('administrative_area_level_1') ||
+          types.contains('administrative_area_level_2')) {
+        score -= 200;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestResult = r as Map<String, dynamic>;
+      }
+    }
+
+    if (bestResult == null) return null;
+
+    // 3. Extraer componentes del mejor candidato
+    final comps = (bestResult['address_components'] as List?) ?? [];
+    String? streetNumber;
+    String? route;
+    String? localNeighborhood = zone;
+    String? localCity = detectedCity;
+
+    for (final comp in comps) {
+      final cTypes = (comp['types'] as List).cast<String>();
+      final name = comp['long_name'] as String? ?? '';
+      if (name.isEmpty) continue;
+      if (cTypes.contains('street_number')) streetNumber = name;
+      if (cTypes.contains('route')) route = name;
+      if (cTypes.contains('neighborhood')) localNeighborhood = name;
+      if (cTypes.contains('locality')) localCity = name;
+    }
+
+    // 4. Si tenemos calle y no es genérica ("Sin nombre"), armar formato profesional
+    if (route != null &&
+        route.isNotEmpty &&
+        !route.toLowerCase().contains('sin nombre')) {
+      final parts = <String>[];
+      final streetPart = (streetNumber != null &&
+              streetNumber.isNotEmpty &&
+              streetNumber.toLowerCase() != 'y')
+          ? '$route $streetNumber'
+          : route;
+      parts.add(streetPart);
+
+      if (localNeighborhood != null &&
+          localNeighborhood.isNotEmpty &&
+          !parts.contains(localNeighborhood)) {
+        parts.add(localNeighborhood);
+      }
+      if (localCity != null &&
+          localCity.isNotEmpty &&
+          !parts.contains(localCity)) {
+        parts.add(localCity);
+      }
+      return parts.join(', ');
+    }
+
+    // 5. Fallback con limpieza de formatted_address
+    final rawFormatted = bestResult['formatted_address'] as String? ?? '';
+    final cleaned = cleanAddress(rawFormatted);
+    if (cleaned.isNotEmpty) {
+      if (localNeighborhood != null &&
+          localNeighborhood.isNotEmpty &&
+          !cleaned.toLowerCase().contains(localNeighborhood.toLowerCase())) {
+        if (localCity != null && cleaned.contains(localCity)) {
+          return cleaned.replaceFirst(
+              localCity, '$localNeighborhood, $localCity');
+        }
+        return '$cleaned, $localNeighborhood';
+      }
+      return cleaned;
+    }
+
+    return null;
+  }
+
   /// Obtiene las coordenadas y dirección formateada a partir de un placeId
   Future<PlaceLocationResult?> getPlaceDetails(String placeId) async {
     if (placeId.isEmpty) return null;
@@ -197,7 +407,7 @@ class GooglePlacesService {
         final url = Uri.parse(
           'https://maps.googleapis.com/maps/api/place/details/json'
           '?place_id=$placeId'
-          '&fields=geometry,formatted_address,name'
+          '&fields=geometry,formatted_address,name,address_components'
           '&key=$key'
           '&language=es',
         );
@@ -214,13 +424,17 @@ class GooglePlacesService {
               if (location != null) {
                 final lat = (location['lat'] as num).toDouble();
                 final lng = (location['lng'] as num).toDouble();
+                final rawAddress = result?['formatted_address'] as String? ??
+                    result?['name'] as String? ??
+                    '';
                 final formattedAddress =
-                    result?['formatted_address'] as String? ??
-                        result?['name'] as String? ??
-                        '';
+                    formatPlaceDetailsAddress(result, rawAddress);
+                final shortAddress = toShortAddress(
+                    rawAddress.isNotEmpty ? rawAddress : formattedAddress);
 
                 return PlaceLocationResult(
                   address: formattedAddress,
+                  shortAddress: shortAddress,
                   latitude: lat,
                   longitude: lng,
                 );
@@ -256,16 +470,9 @@ class GooglePlacesService {
     return null;
   }
 
-  /// Convierte coordenadas geográficas en una dirección legible (Reverse Geocoding)
+  /// Convierte coordenadas geográficas en una dirección exacta y legible (Reverse Geocoding)
   Future<String?> reverseGeocode(double latitude, double longitude) async {
-    // 1. Geoapify Reverse Geocoding (para direcciones con numeración y barrio)
-    final geoapifyResult =
-        await _geoapifyService.reverseGeocode(latitude, longitude);
-    if (geoapifyResult != null && geoapifyResult.isNotEmpty) {
-      return geoapifyResult;
-    }
-
-    // 2. Google Maps Geocoding API
+    // 1. Google Maps Geocoding API (Prioridad principal con ranking de exactitud)
     for (final key in _candidateKeys) {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/geocode/json'
@@ -281,15 +488,21 @@ class GooglePlacesService {
           if (data['status'] == 'OK') {
             final results = data['results'] as List<dynamic>?;
             if (results != null && results.isNotEmpty) {
-              final first = results.first as Map<String, dynamic>;
-              final formatted = first['formatted_address'] as String?;
-              if (formatted != null && formatted.isNotEmpty) {
-                return formatted;
+              final exact = extractExactAddressFromGoogle(results);
+              if (exact != null && exact.isNotEmpty) {
+                return exact;
               }
             }
           }
         }
       } catch (_) {}
+    }
+
+    // 2. Fallback: Geoapify Reverse Geocoding
+    final geoapifyResult =
+        await _geoapifyService.reverseGeocode(latitude, longitude);
+    if (geoapifyResult != null && geoapifyResult.isNotEmpty) {
+      return geoapifyResult;
     }
 
     // 3. Fallback con OpenStreetMap Nominatim
